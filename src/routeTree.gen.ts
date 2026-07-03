@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedLiabilitiesRouteImport } from './routes/_authenticated/liabilities'
 import { Route as AuthenticatedIncomeRouteImport } from './routes/_authenticated/income'
+import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
 import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticated/expenses'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
@@ -50,6 +51,11 @@ const AuthenticatedIncomeRoute = AuthenticatedIncomeRouteImport.update({
   path: '/income',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGoalsRoute = AuthenticatedGoalsRouteImport.update({
+  id: '/goals',
+  path: '/goals',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedExpensesRoute = AuthenticatedExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AuthenticatedAssetsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/expenses': typeof AuthenticatedExpensesRoute
+  '/goals': typeof AuthenticatedGoalsRoute
   '/income': typeof AuthenticatedIncomeRoute
   '/liabilities': typeof AuthenticatedLiabilitiesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/assets': typeof AuthenticatedAssetsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/expenses': typeof AuthenticatedExpensesRoute
+  '/goals': typeof AuthenticatedGoalsRoute
   '/income': typeof AuthenticatedIncomeRoute
   '/liabilities': typeof AuthenticatedLiabilitiesRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/expenses': typeof AuthenticatedExpensesRoute
+  '/_authenticated/goals': typeof AuthenticatedGoalsRoute
   '/_authenticated/income': typeof AuthenticatedIncomeRoute
   '/_authenticated/liabilities': typeof AuthenticatedLiabilitiesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/dashboard'
     | '/expenses'
+    | '/goals'
     | '/income'
     | '/liabilities'
     | '/settings'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/dashboard'
     | '/expenses'
+    | '/goals'
     | '/income'
     | '/liabilities'
     | '/settings'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/_authenticated/assets'
     | '/_authenticated/dashboard'
     | '/_authenticated/expenses'
+    | '/_authenticated/goals'
     | '/_authenticated/income'
     | '/_authenticated/liabilities'
     | '/_authenticated/settings'
@@ -193,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIncomeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/goals': {
+      id: '/_authenticated/goals'
+      path: '/goals'
+      fullPath: '/goals'
+      preLoaderRoute: typeof AuthenticatedGoalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/expenses': {
       id: '/_authenticated/expenses'
       path: '/expenses'
@@ -229,6 +248,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedExpensesRoute: typeof AuthenticatedExpensesRoute
+  AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
   AuthenticatedIncomeRoute: typeof AuthenticatedIncomeRoute
   AuthenticatedLiabilitiesRoute: typeof AuthenticatedLiabilitiesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -239,6 +259,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedExpensesRoute: AuthenticatedExpensesRoute,
+  AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,
   AuthenticatedIncomeRoute: AuthenticatedIncomeRoute,
   AuthenticatedLiabilitiesRoute: AuthenticatedLiabilitiesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
