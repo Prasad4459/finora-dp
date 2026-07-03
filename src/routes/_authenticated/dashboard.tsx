@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { formatINR, formatINRExact, formatINRCompact } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MoneyOS" }] }),
@@ -46,55 +47,52 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 const cashFlowData = [
-  { month: "Jan", income: 6200, expense: 4100 },
-  { month: "Feb", income: 5800, expense: 4400 },
-  { month: "Mar", income: 6400, expense: 4700 },
-  { month: "Apr", income: 7100, expense: 4200 },
-  { month: "May", income: 6900, expense: 5100 },
-  { month: "Jun", income: 7400, expense: 4800 },
-  { month: "Jul", income: 7800, expense: 5200 },
+  { month: "Jan", income: 82000, expense: 41000 },
+  { month: "Feb", income: 85000, expense: 44000 },
+  { month: "Mar", income: 85000, expense: 47000 },
+  { month: "Apr", income: 90000, expense: 42000 },
+  { month: "May", income: 88000, expense: 51000 },
+  { month: "Jun", income: 92000, expense: 48000 },
+  { month: "Jul", income: 85000, expense: 42500 },
 ];
 
 const netWorthData = [
-  { month: "Jan", value: 42000 },
-  { month: "Feb", value: 44500 },
-  { month: "Mar", value: 46100 },
-  { month: "Apr", value: 49200 },
-  { month: "May", value: 51000 },
-  { month: "Jun", value: 54300 },
-  { month: "Jul", value: 58120 },
+  { month: "Jan", value: 1250000 },
+  { month: "Feb", value: 1340000 },
+  { month: "Mar", value: 1450000 },
+  { month: "Apr", value: 1580000 },
+  { month: "May", value: 1690000 },
+  { month: "Jun", value: 1780000 },
+  { month: "Jul", value: 1875000 },
 ];
 
 const expenseBreakdown = [
-  { name: "Housing", value: 1800, color: "var(--chart-1)" },
-  { name: "Food", value: 620, color: "var(--chart-2)" },
-  { name: "Transport", value: 340, color: "var(--chart-3)" },
-  { name: "Shopping", value: 480, color: "var(--chart-4)" },
-  { name: "Entertainment", value: 220, color: "var(--chart-5)" },
-  { name: "Other", value: 180, color: "var(--muted-foreground)" },
+  { name: "Rent", value: 18000, color: "var(--chart-1)" },
+  { name: "Groceries", value: 8500, color: "var(--chart-2)" },
+  { name: "Fuel", value: 4200, color: "var(--chart-3)" },
+  { name: "EMI", value: 6500, color: "var(--chart-4)" },
+  { name: "Entertainment", value: 2800, color: "var(--chart-5)" },
+  { name: "Miscellaneous", value: 2500, color: "var(--muted-foreground)" },
 ];
 
 const recentTransactions = [
-  { id: 1, name: "Whole Foods Market", category: "Groceries", account: "Chase •• 4021", date: "Jul 02", amount: -84.32, icon: ShoppingBag },
-  { id: 2, name: "Salary — Acme Inc.", category: "Income", account: "Chase •• 4021", date: "Jul 01", amount: 5400.0, icon: ArrowDownCircle },
-  { id: 3, name: "Uber", category: "Transport", account: "Amex •• 1009", date: "Jun 30", amount: -18.5, icon: Car },
-  { id: 4, name: "Netflix", category: "Entertainment", account: "Amex •• 1009", date: "Jun 29", amount: -15.99, icon: Film },
-  { id: 5, name: "Blue Bottle Coffee", category: "Food", account: "Chase •• 4021", date: "Jun 29", amount: -6.75, icon: Utensils },
-  { id: 6, name: "Pharmacy", category: "Health", account: "Chase •• 4021", date: "Jun 28", amount: -32.1, icon: Heart },
+  { id: 1, name: "BigBasket", category: "Groceries", account: "HDFC •• 4021", date: "02/07/2026", amount: -2450, icon: ShoppingBag },
+  { id: 2, name: "Salary — Infosys Ltd.", category: "Salary", account: "SBI •• 8891", date: "01/07/2026", amount: 85000, icon: ArrowDownCircle },
+  { id: 3, name: "Ola Cabs", category: "Travel", account: "ICICI •• 1009", date: "30/06/2026", amount: -320, icon: Car },
+  { id: 4, name: "Netflix", category: "Entertainment", account: "HDFC •• 4021", date: "29/06/2026", amount: -649, icon: Film },
+  { id: 5, name: "Swiggy", category: "Food & Dining", account: "Axis •• 3320", date: "29/06/2026", amount: -540, icon: Utensils },
+  { id: 6, name: "Apollo Pharmacy", category: "Healthcare", account: "HDFC •• 4021", date: "28/06/2026", amount: -820, icon: Heart },
 ];
 
 const upcomingBills = [
-  { id: 1, name: "Rent", due: "Jul 05", amount: 1800, icon: Home },
-  { id: 2, name: "Electricity", due: "Jul 08", amount: 92.4, icon: Zap },
-  { id: 3, name: "Internet", due: "Jul 12", amount: 59.99, icon: Wifi },
-  { id: 4, name: "Credit Card", due: "Jul 15", amount: 420.5, icon: CreditCard },
+  { id: 1, name: "Rent", due: "05/07/2026", amount: 18000, icon: Home },
+  { id: 2, name: "Electricity", due: "08/07/2026", amount: 2450, icon: Zap },
+  { id: 3, name: "Jio Fiber", due: "12/07/2026", amount: 999, icon: Wifi },
+  { id: 4, name: "HDFC Credit Card", due: "15/07/2026", amount: 12500, icon: CreditCard },
 ];
 
-const currency = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-
-const currencyExact = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+const currency = formatINR;
+const currencyExact = formatINRExact;
 
 function Dashboard() {
   return (
@@ -112,10 +110,10 @@ function Dashboard() {
 
       {/* Top stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total balance" value={currency(24380)} delta="Across 4 accounts" icon={Wallet} />
-        <StatCard label="Net worth" value={currency(58120)} delta="+7.0% this month" icon={TrendingUp} tone="positive" />
-        <StatCard label="Monthly income" value={currency(7800)} delta="+5.4% vs last mo." icon={ArrowDownCircle} tone="positive" />
-        <StatCard label="Monthly expenses" value={currency(5200)} delta="+1.9% vs last mo." icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Total balance" value={currency(245000)} delta="Across 4 accounts" icon={Wallet} />
+        <StatCard label="Net worth" value={currency(1875000)} delta="+5.3% this month" icon={TrendingUp} tone="positive" />
+        <StatCard label="Monthly income" value={currency(85000)} delta="+4.2% vs last mo." icon={ArrowDownCircle} tone="positive" />
+        <StatCard label="Monthly expenses" value={currency(42500)} delta="-2.1% vs last mo." icon={ArrowUpCircle} tone="negative" />
       </div>
 
       {/* Quick actions */}
@@ -170,7 +168,7 @@ function Dashboard() {
                 <BarChart data={cashFlowData} barGap={6}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatINRCompact} />
                   <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
                   <Bar dataKey="income" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
                   <Bar dataKey="expense" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
@@ -230,7 +228,7 @@ function Dashboard() {
             <p className="text-sm text-muted-foreground">Trailing 7 months</p>
           </div>
           <div className="text-right">
-            <div className="text-lg font-semibold tabular-nums">{currency(58120)}</div>
+            <div className="text-lg font-semibold tabular-nums">{currency(1875000)}</div>
             <div className="text-xs text-primary">+38.4% YTD</div>
           </div>
         </CardHeader>
@@ -246,7 +244,7 @@ function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} />
+                <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatINRCompact} />
                 <Tooltip content={<ChartTooltip valueFormatter={currencyExact} />} />
                 <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} fill="url(#nw)" />
               </AreaChart>
