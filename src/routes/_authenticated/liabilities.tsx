@@ -25,9 +25,9 @@ function Liabilities() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="This month" value="$0.00" icon={CreditCard} tone="negative" />
-        <StatCard label="Year to date" value="$0.00" icon={CreditCard} tone="negative" />
-        <StatCard label="Avg / month" value="$0.00" icon={CreditCard} />
+        <StatCard label="This month" value="₹0" icon={CreditCard} tone="negative" />
+        <StatCard label="Year to date" value="₹0" icon={CreditCard} tone="negative" />
+        <StatCard label="Avg / month" value="₹0" icon={CreditCard} />
       </div>
 
       <div className="mt-6">
