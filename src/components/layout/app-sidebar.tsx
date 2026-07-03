@@ -8,6 +8,9 @@ import {
   CreditCard,
   Settings as SettingsIcon,
   LogOut,
+  Target,
+  PieChart,
+  Receipt,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,11 +29,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 const nav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Accounts", url: "/accounts", icon: Wallet },
+  { title: "Wallets & Accounts", url: "/accounts", icon: Wallet },
   { title: "Income", url: "/income", icon: ArrowDownCircle },
   { title: "Expenses", url: "/expenses", icon: ArrowUpCircle },
   { title: "Assets", url: "/assets", icon: Landmark },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
+  { title: "Goals", url: "/goals", icon: Target },
+  { title: "Budget", url: "/budget", icon: PieChart },
+  { title: "Bills & Reminders", url: "/bills", icon: Receipt },
 ] as const;
 
 export function AppSidebar() {
