@@ -45,7 +45,7 @@ function Settings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Default currency</Label>
-            <Input defaultValue="USD" />
+            <Input defaultValue="INR (₹)" />
           </div>
           <Button size="sm">Save preferences</Button>
         </CardContent>
