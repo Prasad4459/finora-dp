@@ -18,6 +18,10 @@ import {
   MoreHorizontal,
   ArrowUpRight,
   ArrowDownRight,
+  Target,
+  PiggyBank,
+  Sparkles,
+  Receipt,
 } from "lucide-react";
 import {
   Area,
@@ -38,6 +42,7 @@ import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatINR, formatINRExact, formatINRCompact } from "@/lib/format";
 
@@ -91,10 +96,25 @@ const upcomingBills = [
   { id: 4, name: "HDFC Credit Card", due: "15/07/2026", amount: 12500, icon: CreditCard },
 ];
 
+const recentIncome = [
+  { id: 1, name: "Salary — Infosys Ltd.", date: "01/07/2026", amount: 85000 },
+  { id: 2, name: "Freelance — Acme Co.", date: "28/06/2026", amount: 22000 },
+  { id: 3, name: "TCS Dividend", date: "15/06/2026", amount: 3600 },
+  { id: 4, name: "SBI Interest", date: "20/06/2026", amount: 1240 },
+];
+
+const goals = [
+  { id: 1, name: "Emergency Fund", target: 500000, saved: 325000, eta: "Mar 2027" },
+  { id: 2, name: "Goa Vacation", target: 80000, saved: 46000, eta: "Dec 2026" },
+  { id: 3, name: "New MacBook", target: 220000, saved: 90000, eta: "Feb 2027" },
+];
+
 const currency = formatINR;
 const currencyExact = formatINRExact;
 
 function Dashboard() {
+  const savingsRate = Math.round(((85000 - 42500) / 85000) * 100);
+  const healthScore = 78;
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
@@ -114,6 +134,10 @@ function Dashboard() {
         <StatCard label="Net worth" value={currency(1875000)} delta="+5.3% this month" icon={TrendingUp} tone="positive" />
         <StatCard label="Monthly income" value={currency(85000)} delta="+4.2% vs last mo." icon={ArrowDownCircle} tone="positive" />
         <StatCard label="Monthly expenses" value={currency(42500)} delta="-2.1% vs last mo." icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Savings rate" value={`${savingsRate}%`} delta="Healthy — above 40%" icon={PiggyBank} tone="positive" />
+        <StatCard label="Total investments" value={currency(1237000)} delta="MF, Stocks, PPF, EPF" icon={TrendingUp} />
+        <StatCard label="Total debt" value={currency(460250)} delta="Home + Car + CC" icon={CreditCard} tone="negative" />
+        <StatCard label="Upcoming bills" value={currency(33949)} delta="4 bills in 2 weeks" icon={Receipt} />
       </div>
 
       {/* Quick actions */}
@@ -144,6 +168,10 @@ function Dashboard() {
             <Button variant="secondary" size="sm">
               <CreditCard className="mr-1.5 h-4 w-4" />
               Add liability
+            </Button>
+            <Button variant="secondary" size="sm">
+              <Target className="mr-1.5 h-4 w-4" />
+              Create goal
             </Button>
           </div>
         </CardContent>
@@ -250,6 +278,117 @@ function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Goals + Financial Health + Recent income */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <Card className="border-border/70">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base font-semibold">Goals progress</CardTitle>
+              <p className="text-sm text-muted-foreground">Top 3 active goals</p>
+            </div>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {goals.map((g) => {
+              const pct = Math.round((g.saved / g.target) * 100);
+              return (
+                <div key={g.id}>
+                  <div className="mb-1.5 flex items-center justify-between text-sm">
+                    <div className="font-medium">{g.name}</div>
+                    <div className="text-xs text-muted-foreground">ETA {g.eta}</div>
+                  </div>
+                  <Progress value={pct} className="h-2" />
+                  <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
+                    <span>{currency(g.saved)} of {currency(g.target)}</span>
+                    <span className="font-medium text-foreground">{pct}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base font-semibold">Financial health</CardTitle>
+              <p className="text-sm text-muted-foreground">Based on savings, debt & runway</p>
+            </div>
+            <Sparkles className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-2">
+              <div className="text-5xl font-semibold tracking-tight">{healthScore}</div>
+              <div className="pb-1 text-sm text-muted-foreground">/ 100</div>
+              <Badge variant="secondary" className="ml-auto">Good</Badge>
+            </div>
+            <Progress value={healthScore} className="mt-4 h-2" />
+            <ul className="mt-4 space-y-2 text-xs">
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Savings rate</span><span className="font-medium text-primary">Excellent</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Debt-to-income</span><span className="font-medium">Healthy</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Emergency runway</span><span className="font-medium">7.6 months</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Investment diversity</span><span className="font-medium">Balanced</span></li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base font-semibold">Recent income</CardTitle>
+              <p className="text-sm text-muted-foreground">Latest credits</p>
+            </div>
+            <ArrowDownCircle className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-border">
+              {recentIncome.map((i) => (
+                <li key={i.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <ArrowDownCircle className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{i.name}</div>
+                    <div className="text-xs text-muted-foreground">{i.date}</div>
+                  </div>
+                  <div className="text-sm font-semibold text-primary tabular-nums">+{currency(i.amount)}</div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top expense categories */}
+      <Card className="mt-4 border-border/70">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Top expense categories</CardTitle>
+          <p className="text-sm text-muted-foreground">Where most of your money went this month</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {expenseBreakdown.slice(0, 5).map((c) => {
+            const total = expenseBreakdown.reduce((s, x) => s + x.value, 0);
+            const pct = Math.round((c.value / total) * 100);
+            return (
+              <div key={c.name}>
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full" style={{ background: c.color }} />
+                    <span className="font-medium">{c.name}</span>
+                  </div>
+                  <span className="tabular-nums text-muted-foreground">
+                    {currency(c.value)} <span className="text-xs">({pct}%)</span>
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: c.color }} />
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 
