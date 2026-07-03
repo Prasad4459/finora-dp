@@ -25,9 +25,9 @@ function Accounts() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="This month" value="$0.00" icon={Wallet} tone="neutral" />
-        <StatCard label="Year to date" value="$0.00" icon={Wallet} tone="neutral" />
-        <StatCard label="Avg / month" value="$0.00" icon={Wallet} />
+        <StatCard label="This month" value="₹0" icon={Wallet} tone="neutral" />
+        <StatCard label="Year to date" value="₹0" icon={Wallet} tone="neutral" />
+        <StatCard label="Avg / month" value="₹0" icon={Wallet} />
       </div>
 
       <div className="mt-6">

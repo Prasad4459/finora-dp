@@ -25,9 +25,9 @@ function Assets() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="This month" value="$0.00" icon={Landmark} tone="positive" />
-        <StatCard label="Year to date" value="$0.00" icon={Landmark} tone="positive" />
-        <StatCard label="Avg / month" value="$0.00" icon={Landmark} />
+        <StatCard label="This month" value="₹0" icon={Landmark} tone="positive" />
+        <StatCard label="Year to date" value="₹0" icon={Landmark} tone="positive" />
+        <StatCard label="Avg / month" value="₹0" icon={Landmark} />
       </div>
 
       <div className="mt-6">

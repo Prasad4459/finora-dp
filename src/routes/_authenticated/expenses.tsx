@@ -25,9 +25,9 @@ function Expenses() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="This month" value="$0.00" icon={ArrowUpCircle} tone="negative" />
-        <StatCard label="Year to date" value="$0.00" icon={ArrowUpCircle} tone="negative" />
-        <StatCard label="Avg / month" value="$0.00" icon={ArrowUpCircle} />
+        <StatCard label="This month" value="₹0" icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Year to date" value="₹0" icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Avg / month" value="₹0" icon={ArrowUpCircle} />
       </div>
 
       <div className="mt-6">

@@ -16,7 +16,7 @@ function Income() {
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Income"
-        description="Track every dollar that comes in."
+        description="Track every rupee that comes in."
         actions={
           <Button size="sm">
             <Plus className="mr-1 h-4 w-4" /> Add income
@@ -25,9 +25,9 @@ function Income() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="This month" value="$0.00" icon={ArrowDownCircle} tone="positive" />
-        <StatCard label="Year to date" value="$0.00" icon={ArrowDownCircle} tone="positive" />
-        <StatCard label="Avg / month" value="$0.00" icon={ArrowDownCircle} />
+        <StatCard label="This month" value="₹0" icon={ArrowDownCircle} tone="positive" />
+        <StatCard label="Year to date" value="₹0" icon={ArrowDownCircle} tone="positive" />
+        <StatCard label="Avg / month" value="₹0" icon={ArrowDownCircle} />
       </div>
 
       <div className="mt-6">
