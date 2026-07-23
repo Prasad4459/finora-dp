@@ -1,30 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, Wallet, Landmark, Banknote, CreditCard, Smartphone, TrendingUp } from "lucide-react";
+import { Plus, Wallet, Landmark, CreditCard, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatINR, formatDateIN } from "@/lib/format";
+import { useFinance } from "@/lib/finance-store";
 
 export const Route = createFileRoute("/_authenticated/accounts")({
   head: () => ({ meta: [{ title: "Accounts — MoneyOS" }] }),
   component: Accounts,
 });
 
-const accounts = [
-  { id: 1, name: "Salary Account", bank: "HDFC Bank", type: "Savings", balance: 142500, icon: Landmark, color: "bg-blue-500/10 text-blue-600", updated: "2026-07-02" },
-  { id: 2, name: "Joint Savings", bank: "SBI", type: "Savings", balance: 68200, icon: Landmark, color: "bg-emerald-500/10 text-emerald-600", updated: "2026-07-01" },
-  { id: 3, name: "Everyday Spending", bank: "ICICI Bank", type: "Current", balance: 21400, icon: Wallet, color: "bg-orange-500/10 text-orange-600", updated: "2026-07-02" },
-  { id: 4, name: "GPay Wallet", bank: "Google Pay", type: "UPI Wallet", balance: 3800, icon: Smartphone, color: "bg-fuchsia-500/10 text-fuchsia-600", updated: "2026-07-02" },
-  { id: 5, name: "Cash on hand", bank: "—", type: "Cash", balance: 9200, icon: Banknote, color: "bg-amber-500/10 text-amber-600", updated: "2026-06-30" },
-  { id: 6, name: "Amazon Pay ICICI CC", bank: "ICICI Bank", type: "Credit Card", balance: -12500, icon: CreditCard, color: "bg-rose-500/10 text-rose-600", updated: "2026-07-02" },
-  { id: 7, name: "Zerodha", bank: "Zerodha", type: "Investment Account", balance: 484000, icon: TrendingUp, color: "bg-violet-500/10 text-violet-600", updated: "2026-07-01" },
-];
-
 function Accounts() {
+  const { accounts, openDialog, removeAccount } = useFinance();
   const total = accounts.reduce((s, a) => s + a.balance, 0);
   const assets = accounts.filter((a) => a.balance >= 0).reduce((s, a) => s + a.balance, 0);
   const debt = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + Math.abs(a.balance), 0);
@@ -34,7 +25,7 @@ function Accounts() {
         title="Wallets & Accounts"
         description="All your bank, cash, and investment accounts."
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => openDialog("account")}>
             <Plus className="mr-1 h-4 w-4" /> Add account
           </Button>
         }
