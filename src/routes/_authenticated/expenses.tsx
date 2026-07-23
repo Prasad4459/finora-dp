@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Plus, ArrowUpCircle, TrendingDown, Calendar } from "lucide-react";
+import { Plus, ArrowUpCircle, TrendingDown, Calendar, Trash2 } from "lucide-react";
 import { Bar, BarChart, Cell, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
@@ -8,22 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
+import { useFinance } from "@/lib/finance-store";
 
 export const Route = createFileRoute("/_authenticated/expenses")({
   head: () => ({ meta: [{ title: "Expenses — MoneyOS" }] }),
   component: Expenses,
 });
-
-const expenses = [
-  { id: 1, date: "2026-07-02", merchant: "BigBasket", category: "Groceries", account: "HDFC •• 4021", method: "UPI", amount: 2450 },
-  { id: 2, date: "2026-07-01", merchant: "House Rent — Landlord", category: "Rent", account: "SBI •• 8891", method: "Bank transfer", amount: 18000 },
-  { id: 3, date: "2026-06-30", merchant: "Ola Cabs", category: "Travel", account: "ICICI •• 1009", method: "UPI", amount: 320 },
-  { id: 4, date: "2026-06-29", merchant: "Netflix", category: "Entertainment", account: "HDFC •• 4021", method: "Card", amount: 649 },
-  { id: 5, date: "2026-06-29", merchant: "Swiggy", category: "Food", account: "Axis •• 3320", method: "UPI", amount: 540 },
-  { id: 6, date: "2026-06-28", merchant: "Apollo Pharmacy", category: "Medical", account: "HDFC •• 4021", method: "UPI", amount: 820 },
-  { id: 7, date: "2026-06-27", merchant: "Indian Oil", category: "Fuel", account: "ICICI •• 1009", method: "Card", amount: 2200 },
-  { id: 8, date: "2026-06-25", merchant: "Myntra", category: "Shopping", account: "HDFC •• 4021", method: "Card", amount: 3200 },
-];
 
 const catBreakdown = [
   { name: "Rent", value: 18000, color: "var(--chart-1)" },
@@ -44,8 +34,9 @@ const trend = [
 ];
 
 function Expenses() {
-  const monthTotal = 42500;
-  const ytd = trend.reduce((s, t) => s + t.value, 0);
+  const { expenses, openDialog, removeExpense } = useFinance();
+  const monthTotal = expenses.filter((e) => e.date.startsWith("2026-07")).reduce((s, e) => s + e.amount, 0);
+  const ytd = expenses.reduce((s, e) => s + e.amount, 0);
   const avg = Math.round(ytd / trend.length);
   return (
     <div className="mx-auto max-w-7xl">
@@ -53,7 +44,7 @@ function Expenses() {
         title="Expenses"
         description="See where your money goes, honestly."
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => openDialog("expense")}>
             <Plus className="mr-1 h-4 w-4" /> Add expense
           </Button>
         }
@@ -112,6 +103,7 @@ function Expenses() {
                 <TableHead>Account</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -123,6 +115,7 @@ function Expenses() {
                   <TableCell className="text-muted-foreground">{e.account}</TableCell>
                   <TableCell className="text-muted-foreground">{e.method}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">-{formatINR(e.amount)}</TableCell>
+                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeExpense(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
