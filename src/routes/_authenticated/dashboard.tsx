@@ -45,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatINR, formatINRExact, formatINRCompact } from "@/lib/format";
+import { useFinance } from "@/lib/finance-store";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MoneyOS" }] }),
@@ -113,7 +114,16 @@ const currency = formatINR;
 const currencyExact = formatINRExact;
 
 function Dashboard() {
-  const savingsRate = Math.round(((85000 - 42500) / 85000) * 100);
+  const { openDialog, accounts, incomes, expenses, assets, liabilities, bills: allBills, goals: allGoals } = useFinance();
+  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
+  const totalInvestments = assets.filter((a) => ["Stocks", "Mutual Funds", "PPF", "EPF", "NPS", "Crypto", "FD"].includes(a.type)).reduce((s, a) => s + a.current, 0);
+  const totalAssets = assets.reduce((s, a) => s + a.current, 0);
+  const totalDebt = liabilities.reduce((s, l) => s + l.balance, 0);
+  const netWorth = totalBalance + totalAssets - totalDebt;
+  const monthIncome = incomes.filter((i) => i.date.startsWith("2026-07")).reduce((s, i) => s + i.amount, 0) || incomes.slice(0, 3).reduce((s, i) => s + i.amount, 0);
+  const monthExpenses = expenses.filter((e) => e.date.startsWith("2026-07")).reduce((s, e) => s + e.amount, 0);
+  const upcomingTotal = allBills.reduce((s, b) => s + b.amount, 0);
+  const savingsRate = monthIncome > 0 ? Math.round(((monthIncome - monthExpenses) / monthIncome) * 100) : 0;
   const healthScore = 78;
   return (
     <div className="mx-auto max-w-7xl">
@@ -121,7 +131,7 @@ function Dashboard() {
         title="Dashboard"
         description="A calm overview of your finances."
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => openDialog("expense")}>
             <Plus className="mr-1.5 h-4 w-4" />
             Add transaction
           </Button>
@@ -130,14 +140,14 @@ function Dashboard() {
 
       {/* Top stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total balance" value={currency(245000)} delta="Across 4 accounts" icon={Wallet} />
-        <StatCard label="Net worth" value={currency(1875000)} delta="+5.3% this month" icon={TrendingUp} tone="positive" />
-        <StatCard label="Monthly income" value={currency(85000)} delta="+4.2% vs last mo." icon={ArrowDownCircle} tone="positive" />
-        <StatCard label="Monthly expenses" value={currency(42500)} delta="-2.1% vs last mo." icon={ArrowUpCircle} tone="negative" />
-        <StatCard label="Savings rate" value={`${savingsRate}%`} delta="Healthy — above 40%" icon={PiggyBank} tone="positive" />
-        <StatCard label="Total investments" value={currency(1237000)} delta="MF, Stocks, PPF, EPF" icon={TrendingUp} />
-        <StatCard label="Total debt" value={currency(460250)} delta="Home + Car + CC" icon={CreditCard} tone="negative" />
-        <StatCard label="Upcoming bills" value={currency(33949)} delta="4 bills in 2 weeks" icon={Receipt} />
+        <StatCard label="Total balance" value={currency(totalBalance)} delta={`Across ${accounts.length} accounts`} icon={Wallet} />
+        <StatCard label="Net worth" value={currency(netWorth)} delta="Assets − Liabilities" icon={TrendingUp} tone="positive" />
+        <StatCard label="Monthly income" value={currency(monthIncome)} delta={`${incomes.length} entries`} icon={ArrowDownCircle} tone="positive" />
+        <StatCard label="Monthly expenses" value={currency(monthExpenses)} delta={`${expenses.length} entries`} icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Savings rate" value={`${savingsRate}%`} delta={savingsRate >= 40 ? "Healthy — above 40%" : "Aim for 40%+"} icon={PiggyBank} tone={savingsRate >= 40 ? "positive" : "neutral"} />
+        <StatCard label="Total investments" value={currency(totalInvestments)} delta="MF, Stocks, PPF, EPF" icon={TrendingUp} />
+        <StatCard label="Total debt" value={currency(totalDebt)} delta={`${liabilities.length} liabilities`} icon={CreditCard} tone="negative" />
+        <StatCard label="Upcoming bills" value={currency(upcomingTotal)} delta={`${allBills.length} bills`} icon={Receipt} />
       </div>
 
       {/* Quick actions */}
@@ -153,23 +163,23 @@ function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={() => openDialog("income")}>
               <ArrowDownCircle className="mr-1.5 h-4 w-4 text-primary" />
               Add income
             </Button>
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={() => openDialog("expense")}>
               <ArrowUpCircle className="mr-1.5 h-4 w-4 text-destructive" />
               Add expense
             </Button>
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={() => openDialog("asset")}>
               <Landmark className="mr-1.5 h-4 w-4" />
               Add asset
             </Button>
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={() => openDialog("liability")}>
               <CreditCard className="mr-1.5 h-4 w-4" />
               Add liability
             </Button>
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary" size="sm" onClick={() => openDialog("goal")}>
               <Target className="mr-1.5 h-4 w-4" />
               Create goal
             </Button>
@@ -472,7 +482,7 @@ function Dashboard() {
               })}
             </ul>
             <div className="p-3">
-              <Button variant="outline" size="sm" className="w-full">
+              <Button variant="outline" size="sm" className="w-full" onClick={() => openDialog("bill")}>
                 <Plus className="mr-1.5 h-4 w-4" />
                 Add bill
               </Button>
