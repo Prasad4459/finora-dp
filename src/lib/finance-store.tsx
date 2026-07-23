@@ -299,7 +299,7 @@ function FormDialog({
 }: {
   open: boolean; onClose: () => void; title: string;
   fields: FieldDef[];
-  onSubmit: (values: Record<string, string | boolean>) => void;
+  onSubmit: (values: Record<string, any>) => void;
 }) {
   const initial = useMemo(() => {
     const o: Record<string, string | boolean> = {};
