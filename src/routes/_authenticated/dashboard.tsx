@@ -482,7 +482,7 @@ function Dashboard() {
               })}
             </ul>
             <div className="p-3">
-              <Button variant="outline" size="sm" className="w-full">
+              <Button variant="outline" size="sm" className="w-full" onClick={() => openDialog("bill")}>
                 <Plus className="mr-1.5 h-4 w-4" />
                 Add bill
               </Button>
