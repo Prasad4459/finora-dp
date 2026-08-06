@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
 export type Account = {
-  id: number;
+  id: string;
   name: string;
   bank: string;
   type: string;
@@ -12,7 +12,7 @@ export type Account = {
 };
 
 export type Income = {
-  id: number;
+  id: string;
   date: string;
   source: string;
   category: string;
@@ -22,7 +22,7 @@ export type Income = {
 };
 
 export type Expense = {
-  id: number;
+  id: string;
   date: string;
   merchant: string;
   category: string;
@@ -32,7 +32,7 @@ export type Expense = {
 };
 
 export type Asset = {
-  id: number;
+  id: string;
   name: string;
   type: string;
   purchase: number;
@@ -41,7 +41,7 @@ export type Asset = {
 };
 
 export type Liability = {
-  id: number;
+  id: string;
   name: string;
   type: string;
   balance: number;
@@ -53,7 +53,7 @@ export type Liability = {
 };
 
 export type Goal = {
-  id: number;
+  id: string;
   name: string;
   icon: LucideIcon;
   target: number;
@@ -61,10 +61,10 @@ export type Goal = {
   date: string;
 };
 
-export type Budget = { name: string; spent: number; budget: number };
+export type Budget = { id: string; name: string; spent: number; budget: number };
 
 export type Bill = {
-  id: number;
+  id: string;
   name: string;
   category: string;
   due: string;
