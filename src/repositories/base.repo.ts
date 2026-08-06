@@ -8,6 +8,27 @@ type Row<T extends TableName> = PublicSchema["Tables"][T]["Row"];
 type Insert<T extends TableName> = PublicSchema["Tables"][T]["Insert"];
 type Update<T extends TableName> = PublicSchema["Tables"][T]["Update"];
 
+/**
+ * Loosely-typed view of the client. The generated Supabase types cannot infer
+ * a generic table name, so we narrow the return types ourselves below.
+ */
+type UntypedQuery = {
+  select: (cols: string) => UntypedQuery;
+  insert: (values: unknown) => UntypedQuery;
+  update: (values: unknown) => UntypedQuery;
+  delete: () => UntypedQuery;
+  eq: (col: string, value: unknown) => UntypedQuery;
+  is: (col: string, value: unknown) => UntypedQuery;
+  gte: (col: string, value: unknown) => UntypedQuery;
+  lte: (col: string, value: unknown) => UntypedQuery;
+  order: (col: string, opts: { ascending: boolean }) => UntypedQuery;
+  limit: (n: number) => UntypedQuery;
+  maybeSingle: () => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  single: () => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+} & PromiseLike<{ data: unknown; error: { message: string } | null }>;
+
+const db = supabase as unknown as { from: (table: string) => UntypedQuery };
+
 export type ListOptions = {
   orderBy?: string;
   ascending?: boolean;
@@ -36,7 +57,7 @@ export async function currentUserId(): Promise<string> {
 export function createRepository<T extends TableName>(table: T) {
   return {
     async list(options: ListOptions = {}): Promise<Row<T>[]> {
-      let query = supabase.from(table).select("*");
+      let query = db.from(table).select("*");
       for (const [key, value] of Object.entries(options.filters ?? {})) {
         query = value === null ? query.is(key, null) : query.eq(key, value);
       }
