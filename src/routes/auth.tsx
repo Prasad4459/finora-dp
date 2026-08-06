@@ -23,6 +23,8 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"auth" | "forgot">("auth");
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -61,6 +63,63 @@ function AuthPage() {
     navigate({ to: "/dashboard" });
   }
 
+  async function sendReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email) return toast.error("Enter your email first.");
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + "/reset-password",
+    });
+    setLoading(false);
+    if (error) return toast.error(error.message);
+    setSent(true);
+    toast.success("Password reset link sent. Check your inbox.");
+  }
+
+  if (mode === "forgot") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <div className="w-full max-w-md">
+          <div className="mb-8 text-center">
+            <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground font-bold">
+              M
+            </div>
+            <h1 className="mt-4 text-2xl font-semibold tracking-tight">Forgot your password?</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              We'll email you a secure link to set a new one.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            {sent ? (
+              <p className="text-sm text-muted-foreground">
+                If an account exists for <span className="font-medium text-foreground">{email}</span>,
+                a reset link is on its way. The link opens the page where you set a new password.
+              </p>
+            ) : (
+              <form onSubmit={sendReset} className="space-y-4">
+                <Field label="Email" value={email} onChange={setEmail} type="email" />
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Sending…" : "Send reset link"}
+                </Button>
+              </form>
+            )}
+            <Button
+              variant="ghost"
+              className="mt-3 w-full"
+              onClick={() => {
+                setMode("auth");
+                setSent(false);
+              }}
+            >
+              Back to sign in
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4">
       <div className="w-full max-w-md">
@@ -86,6 +145,13 @@ function AuthPage() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Signing in…" : "Sign in"}
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setMode("forgot")}
+                  className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Forgot password?
+                </button>
               </form>
             </TabsContent>
 
