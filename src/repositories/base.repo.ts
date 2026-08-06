@@ -13,7 +13,7 @@ type Update<T extends TableName> = PublicSchema["Tables"][T]["Update"];
  * a generic table name, so we narrow the return types ourselves below.
  */
 type UntypedQuery = {
-  select: (cols: string) => UntypedQuery;
+  select: (cols?: string) => UntypedQuery;
   insert: (values: unknown) => UntypedQuery;
   update: (values: unknown) => UntypedQuery;
   delete: () => UntypedQuery;
@@ -70,24 +70,24 @@ export function createRepository<T extends TableName>(table: T) {
     },
 
     async getById(id: string): Promise<Row<T> | null> {
-      const { data, error } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+      const { data, error } = await db.from(table).select("*").eq("id", id).maybeSingle();
       return unwrap(data, error, `${table}.getById`) as Row<T> | null;
     },
 
     async create(values: Omit<Insert<T>, "user_id"> & { user_id?: string }): Promise<Row<T>> {
       const user_id = values.user_id ?? (await currentUserId());
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from(table)
-        .insert({ ...values, user_id } as never)
+        .insert({ ...values, user_id })
         .select()
         .single();
       return unwrap(data, error, `${table}.create`) as Row<T>;
     },
 
     async update(id: string, values: Update<T>): Promise<Row<T>> {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from(table)
-        .update(values as never)
+        .update(values)
         .eq("id", id)
         .select()
         .single();
@@ -95,7 +95,7 @@ export function createRepository<T extends TableName>(table: T) {
     },
 
     async remove(id: string): Promise<void> {
-      const { error } = await supabase.from(table).delete().eq("id", id);
+      const { error } = await db.from(table).delete().eq("id", id);
       if (error) throw new Error(`[${table}.remove] ${error.message}`);
     },
   };
