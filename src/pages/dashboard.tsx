@@ -36,7 +36,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader } from "@/components/finance/page-header";
+import { useFinanceGreeting } from "@/components/finance/use-greeting";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +111,43 @@ const currency = formatINR;
 const currencyExact = formatINRExact;
 
 export function Dashboard() {
+  return <DashboardInner />;
+}
+
+function WelcomeHeader({ onAdd }: { onAdd: () => void }) {
+  const greeting = useFinanceGreeting();
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      if (!user) return;
+      const meta = (user.user_metadata ?? {}) as { full_name?: string; name?: string };
+      const label = meta.full_name || meta.name || user.email?.split("@")[0] || "";
+      setName(label ? label.charAt(0).toUpperCase() + label.slice(1) : "");
+    });
+  }, []);
+
+  return (
+    <div className="mb-8 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+      <div className="min-w-0">
+        <h1 className="truncate text-3xl font-semibold tracking-tight sm:text-4xl">
+          {greeting}
+          {name ? `, ${name}` : ""} <span className="align-middle">👋</span>
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your Financial Life. <span className="font-medium text-primary">Organized.</span>
+        </p>
+      </div>
+      <Button size="sm" className="shrink-0" onClick={onAdd}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        Add transaction
+      </Button>
+    </div>
+  );
+}
+
+function DashboardInner() {
   const { openDialog, accounts, incomes, expenses, assets, liabilities, bills: allBills, goals: allGoals } = useFinance();
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
   const totalInvestments = assets.filter((a) => ["Stocks", "Mutual Funds", "PPF", "EPF", "NPS", "Crypto", "FD"].includes(a.type)).reduce((s, a) => s + a.current, 0);
@@ -122,16 +161,7 @@ export function Dashboard() {
   const healthScore = 78;
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title="Dashboard"
-        description="A calm overview of your finances."
-        actions={
-          <Button size="sm" onClick={() => openDialog("expense")}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add transaction
-          </Button>
-        }
-      />
+      <WelcomeHeader onAdd={() => openDialog("expense")} />
 
       {/* Top stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

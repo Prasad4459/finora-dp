@@ -16,14 +16,16 @@ export function StatCard({
   tone?: "neutral" | "positive" | "negative";
 }) {
   return (
-    <Card className="border-border/70">
+    <Card className="border-border/70 hover:-translate-y-0.5">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="min-w-0">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {label}
             </div>
-            <div className="mt-2 truncate text-2xl font-semibold tracking-tight">{value}</div>
+            <div className="mt-2 truncate font-display text-2xl font-semibold tracking-tight tabular-nums">
+              {value}
+            </div>
             {delta && (
               <div
                 className={cn(

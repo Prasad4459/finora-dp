@@ -26,6 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
+import { FinoraLogo } from "@/components/brand/logo";
 
 const nav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -53,14 +54,16 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-2">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">
-            M
-          </div>
+        <div className="flex items-center gap-2.5 px-2 py-2.5">
+          <FinoraLogo size="sm" markOnly />
           {!collapsed && (
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">MoneyOS</div>
-              <div className="truncate text-xs text-muted-foreground">Finance workspace</div>
+              <div className="brand-wordmark truncate text-[15px] leading-none">
+                Finora<span className="text-primary">.</span>
+              </div>
+              <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                Your Financial Life. Organized.
+              </div>
             </div>
           )}
         </div>
