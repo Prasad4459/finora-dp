@@ -37,6 +37,9 @@ import {
   YAxis,
 } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
+import { useFinanceGreeting } from "@/components/finance/use-greeting";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,16 +125,7 @@ export function Dashboard() {
   const healthScore = 78;
   return (
     <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title="Dashboard"
-        description="A calm overview of your finances."
-        actions={
-          <Button size="sm" onClick={() => openDialog("expense")}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add transaction
-          </Button>
-        }
-      />
+      <WelcomeHeader onAdd={() => openDialog("expense")} />
 
       {/* Top stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
