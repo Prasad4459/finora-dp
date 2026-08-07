@@ -36,7 +36,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageHeader } from "@/components/finance/page-header";
 import { useFinanceGreeting } from "@/components/finance/use-greeting";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
