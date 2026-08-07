@@ -1,4 +1,4 @@
-import { Plus, CreditCard, Wallet, Trash2 } from "lucide-react";
+import { Plus, CreditCard, Wallet, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useFinance } from "@/store/finance-store";
 
 
 export function Liabilities() {
-  const { liabilities, openDialog, removeLiability } = useFinance();
+  const { liabilities, openDialog, openEditDialog, removeLiability } = useFinance();
   const total = liabilities.reduce((s, l) => s + l.balance, 0);
   const emi = liabilities.reduce((s, l) => s + l.emi, 0);
   return (
@@ -61,7 +61,7 @@ export function Liabilities() {
                   <TableCell>
                     <Badge variant={l.status === "Due" ? "destructive" : "secondary"} className="text-[10px]">{l.status}</Badge>
                   </TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeLiability(l.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "liability", entity: l })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeLiability(l.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>

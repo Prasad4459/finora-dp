@@ -1,4 +1,4 @@
-import { Plus, Landmark, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { Plus, Landmark, TrendingUp, TrendingDown, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useFinance } from "@/store/finance-store";
 
 
 export function Assets() {
-  const { assets, openDialog, removeAsset } = useFinance();
+  const { assets, openDialog, openEditDialog, removeAsset } = useFinance();
   const totalCur = assets.reduce((s, a) => s + a.current, 0);
   const totalPur = assets.reduce((s, a) => s + a.purchase, 0);
   const gain = totalCur - totalPur;
@@ -68,7 +68,7 @@ export function Assets() {
                     <TableCell className={cn("text-right tabular-nums font-semibold", pl >= 0 ? "text-primary" : "text-destructive")}>
                       {pl >= 0 ? "+" : ""}{formatINR(pl)} <span className="text-xs opacity-70">({pct.toFixed(1)}%)</span>
                     </TableCell>
-                    <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeAsset(a.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                    <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "asset", entity: a })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeAsset(a.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                   </TableRow>
                 );
               })}

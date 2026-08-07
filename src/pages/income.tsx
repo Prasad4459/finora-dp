@@ -1,4 +1,4 @@
-import { Plus, ArrowDownCircle, TrendingUp, Calendar, Trash2 } from "lucide-react";
+import { Plus, ArrowDownCircle, TrendingUp, Calendar, Trash2, Pencil } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
@@ -20,7 +20,7 @@ const trend = [
 ];
 
 export function Income() {
-  const { incomes, openDialog, removeIncome } = useFinance();
+  const { incomes, openDialog, openEditDialog, removeIncome } = useFinance();
   const monthTotal = incomes
     .filter((i) => i.date.startsWith("2026-07"))
     .reduce((s, i) => s + i.amount, 0);
@@ -95,7 +95,7 @@ export function Income() {
                   <TableCell><Badge variant="outline" className="text-[10px]">{i.category}</Badge></TableCell>
                   <TableCell className="text-muted-foreground">{i.account}</TableCell>
                   <TableCell className="text-right font-semibold text-primary tabular-nums">+{formatINR(i.amount)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeIncome(i.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "income", entity: i })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeIncome(i.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>
