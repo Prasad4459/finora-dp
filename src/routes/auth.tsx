@@ -7,12 +7,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { FinoraLogo } from "@/components/brand/logo";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — Finora" },
-      { name: "description", content: "Sign in or create your Finora account." },
+      { name: "description", content: "Sign in to Finora — your financial life, organized." },
+      { property: "og:title", content: "Sign in — Finora" },
+      { property: "og:description", content: "Sign in to Finora — your financial life, organized." },
     ],
   }),
   component: AuthPage,
@@ -81,16 +84,14 @@ function AuthPage() {
       <div className="grid min-h-screen place-items-center bg-background px-4">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
-            <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground font-bold">
-              M
-            </div>
+            <FinoraLogo size="lg" className="justify-center" />
             <h1 className="mt-4 text-2xl font-semibold tracking-tight">Forgot your password?</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               We'll email you a secure link to set a new one.
             </p>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="card-elevated rounded-2xl border border-border bg-card p-6">
             {sent ? (
               <p className="text-sm text-muted-foreground">
                 If an account exists for <span className="font-medium text-foreground">{email}</span>,
@@ -124,14 +125,12 @@ function AuthPage() {
     <div className="grid min-h-screen place-items-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground font-bold">
-            M
-          </div>
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight">Welcome to Finora</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to your finance workspace</p>
+          <FinoraLogo size="lg" className="justify-center" />
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight">Welcome to Finora</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Your Financial Life. Organized.</p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <div className="card-elevated rounded-2xl border border-border bg-card p-6">
           <Tabs defaultValue="signin">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
