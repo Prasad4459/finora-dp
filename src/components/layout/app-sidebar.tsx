@@ -59,7 +59,7 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">MoneyOS</div>
+              <div className="truncate text-sm font-semibold">Finora</div>
               <div className="truncate text-xs text-muted-foreground">Finance workspace</div>
             </div>
           )}

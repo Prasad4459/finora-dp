@@ -11,8 +11,8 @@ import { lovable } from "@/integrations/lovable";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — MoneyOS" },
-      { name: "description", content: "Sign in or create your MoneyOS account." },
+      { title: "Sign in — Finora" },
+      { name: "description", content: "Sign in or create your Finora account." },
     ],
   }),
   component: AuthPage,
@@ -127,7 +127,7 @@ function AuthPage() {
           <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground font-bold">
             M
           </div>
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight">Welcome to MoneyOS</h1>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight">Welcome to Finora</h1>
           <p className="mt-1 text-sm text-muted-foreground">Sign in to your finance workspace</p>
         </div>
 

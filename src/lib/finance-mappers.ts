@@ -1,5 +1,5 @@
 // Mapping layer between Supabase rows (snake_case, enums) and the UI models
-// used by the existing MoneyOS components. Keeps the UI unchanged.
+// used by the existing Finora components. Keeps the UI unchanged.
 import { PiggyBank, Receipt } from "lucide-react";
 import {
   ACCOUNT_TYPE_META,

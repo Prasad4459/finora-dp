@@ -36,7 +36,7 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Settings" description="Manage your MoneyOS workspace." />
+      <PageHeader title="Settings" description="Manage your Finora workspace." />
 
       <Card className="border-border/70">
         <CardHeader>

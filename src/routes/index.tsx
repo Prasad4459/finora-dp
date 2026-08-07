@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MoneyOS — Personal Finance, Reimagined" },
+      { title: "Finora — Personal Finance, Reimagined" },
       {
         name: "description",
         content:
@@ -31,7 +31,7 @@ function Landing() {
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground font-bold">
             M
           </div>
-          <span className="text-lg font-semibold tracking-tight">MoneyOS</span>
+          <span className="text-lg font-semibold tracking-tight">Finora</span>
         </div>
         <nav className="flex items-center gap-2">
           <Button variant="ghost" asChild>
@@ -52,13 +52,13 @@ function Landing() {
             Your money, <span className="text-primary">organized.</span>
           </h1>
           <p className="mt-5 text-lg text-muted-foreground">
-            MoneyOS brings your accounts, income, expenses, assets, and liabilities into one calm,
+            Finora brings your accounts, income, expenses, assets, and liabilities into one calm,
             beautifully crafted workspace.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Button size="lg" asChild>
               <Link to="/auth">
-                Open MoneyOS <ArrowRight className="ml-2 h-4 w-4" />
+                Open Finora <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </div>

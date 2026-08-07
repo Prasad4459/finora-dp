@@ -10,10 +10,10 @@ export const Route = createFileRoute("/reset-password")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Reset password — MoneyOS" },
-      { name: "description", content: "Set a new password for your MoneyOS account." },
-      { property: "og:title", content: "Reset password — MoneyOS" },
-      { property: "og:description", content: "Set a new password for your MoneyOS account." },
+      { title: "Reset password — Finora" },
+      { name: "description", content: "Set a new password for your Finora account." },
+      { property: "og:title", content: "Reset password — Finora" },
+      { property: "og:description", content: "Set a new password for your Finora account." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

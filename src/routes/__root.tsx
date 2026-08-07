@@ -78,14 +78,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MoneyOS — Personal Finance, Reimagined" },
-      { name: "description", content: "MoneyOS is a modern personal finance workspace to track accounts, income, expenses, assets, and liabilities in one place." },
-      { name: "author", content: "MoneyOS" },
-      { property: "og:title", content: "MoneyOS — Personal Finance, Reimagined" },
+      { title: "Finora — Personal Finance, Reimagined" },
+      { name: "description", content: "Finora is a modern personal finance workspace to track accounts, income, expenses, assets, and liabilities in one place." },
+      { name: "author", content: "Finora" },
+      { property: "og:title", content: "Finora — Personal Finance, Reimagined" },
       { property: "og:description", content: "Track accounts, income, expenses, assets, and liabilities in one premium finance workspace." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@MoneyOS" },
+      { name: "twitter:site", content: "@Finora" },
     ],
     links: [
       {
