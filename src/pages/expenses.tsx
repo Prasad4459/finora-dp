@@ -1,4 +1,4 @@
-import { Plus, ArrowUpCircle, TrendingDown, Calendar, Trash2 } from "lucide-react";
+import { Plus, ArrowUpCircle, TrendingDown, Calendar, Trash2, Pencil } from "lucide-react";
 import { Bar, BarChart, Cell, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
@@ -29,7 +29,7 @@ const trend = [
 ];
 
 export function Expenses() {
-  const { expenses, openDialog, removeExpense } = useFinance();
+  const { expenses, openDialog, openEditDialog, removeExpense } = useFinance();
   const monthTotal = expenses.filter((e) => e.date.startsWith("2026-07")).reduce((s, e) => s + e.amount, 0);
   const ytd = expenses.reduce((s, e) => s + e.amount, 0);
   const avg = Math.round(ytd / trend.length);
@@ -110,7 +110,7 @@ export function Expenses() {
                   <TableCell className="text-muted-foreground">{e.account}</TableCell>
                   <TableCell className="text-muted-foreground">{e.method}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">-{formatINR(e.amount)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeExpense(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "expense", entity: e })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeExpense(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>

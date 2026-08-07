@@ -1,4 +1,4 @@
-import { Plus, Receipt, Trash2 } from "lucide-react";
+import { Plus, Receipt, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { useFinance } from "@/store/finance-store";
 
 
 export function Bills() {
-  const { bills, openDialog, removeBill } = useFinance();
+  const { bills, openDialog, openEditDialog, removeBill } = useFinance();
   const total = bills.reduce((s, b) => s + b.amount, 0);
   return (
     <div className="mx-auto max-w-7xl">
@@ -45,7 +45,7 @@ export function Bills() {
                   <Badge variant="secondary" className="hidden sm:inline-flex text-[10px]">Due {b.due}</Badge>
                   <div className="w-28 text-right text-sm font-semibold tabular-nums">{formatINR(b.amount)}</div>
                   <Button size="sm" variant="outline" onClick={() => removeBill(b.id)}>Pay</Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeBill(b.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "bill", entity: b })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeBill(b.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </li>
               );
             })}

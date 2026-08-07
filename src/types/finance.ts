@@ -61,7 +61,13 @@ export type Goal = {
   date: string;
 };
 
-export type Budget = { id: string; name: string; spent: number; budget: number };
+export type Budget = {
+  id: string;
+  name: string;
+  spent: number;
+  budget: number;
+  categoryId: string | null;
+};
 
 export type Bill = {
   id: string;

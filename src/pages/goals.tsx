@@ -1,4 +1,4 @@
-import { Plus, Target, PiggyBank, Trash2 } from "lucide-react";
+import { Plus, Target, PiggyBank, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useFinance } from "@/store/finance-store";
 
 
 export function Goals() {
-  const { goals, openDialog, removeGoal } = useFinance();
+  const { goals, openDialog, openEditDialog, removeGoal } = useFinance();
   const target = goals.reduce((s, g) => s + g.target, 0);
   const current = goals.reduce((s, g) => s + g.current, 0);
   return (
@@ -42,7 +42,7 @@ export function Goals() {
                       <div className="text-sm font-semibold">{g.name}</div>
                       <div className="flex items-center gap-1">
                         <Badge variant="secondary" className="text-[10px]">By {formatDateIN(g.date)}</Badge>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeGoal(g.id)}><Trash2 className="h-3 w-3" /></Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog({ kind: "goal", entity: g })}><Pencil className="h-3 w-3" /></Button><Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeGoal(g.id)}><Trash2 className="h-3 w-3" /></Button>
                       </div>
                     </div>
                     <div className="mt-0.5 text-xs text-muted-foreground">

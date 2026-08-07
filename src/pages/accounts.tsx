@@ -1,4 +1,4 @@
-import { Plus, Wallet, Landmark, CreditCard, Trash2 } from "lucide-react";
+import { Plus, Wallet, Landmark, CreditCard, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useFinance } from "@/store/finance-store";
 
 
 export function Accounts() {
-  const { accounts, openDialog, removeAccount } = useFinance();
+  const { accounts, openDialog, openEditDialog, removeAccount } = useFinance();
   const total = accounts.reduce((s, a) => s + a.balance, 0);
   const assets = accounts.filter((a) => a.balance >= 0).reduce((s, a) => s + a.balance, 0);
   const debt = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + Math.abs(a.balance), 0);
@@ -81,7 +81,7 @@ export function Accounts() {
                   <TableCell className="text-muted-foreground">{a.bank}</TableCell>
                   <TableCell className="text-muted-foreground">{formatDateIN(a.updated)}</TableCell>
                   <TableCell className={`text-right tabular-nums ${a.balance < 0 ? "text-destructive" : ""}`}>{formatINR(a.balance)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeAccount(a.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "account", entity: a })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeAccount(a.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                 </TableRow>
               ))}
             </TableBody>

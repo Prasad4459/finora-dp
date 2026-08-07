@@ -1,4 +1,4 @@
-import { supabase } from "@/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { createRepository } from "./base.repo";
 import type { Transaction, TransactionType } from "@/types/database";
 

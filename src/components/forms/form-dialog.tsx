@@ -28,12 +28,17 @@ export function FormDialog({
   title,
   fields,
   onSubmit,
+  initialValues,
+  submitLabel = "Save",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   fields: FieldDef[];
   onSubmit: (values: Record<string, any>) => void;
+  /** Pre-populated values, used when editing an existing entity. */
+  initialValues?: Record<string, string | boolean> | null;
+  submitLabel?: string;
 }) {
   const initial = useMemo(() => {
     const o: Record<string, string | boolean> = {};
@@ -41,8 +46,8 @@ export function FormDialog({
       if (f.type === "switch") o[f.key] = false;
       else o[f.key] = f.default ?? "";
     });
-    return o;
-  }, [fields]);
+    return { ...o, ...(initialValues ?? {}) };
+  }, [fields, initialValues]);
   const [values, setValues] = useState<Record<string, string | boolean>>(initial);
 
   const [lastOpen, setLastOpen] = useState(open);
@@ -111,7 +116,7 @@ export function FormDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              Save
+              {submitLabel}
             </Button>
           </DialogFooter>
         </form>
