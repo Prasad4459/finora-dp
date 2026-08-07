@@ -1,4 +1,4 @@
-import { supabase } from "@/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type PublicSchema = Database["public"];
@@ -7,6 +7,9 @@ export type TableName = keyof PublicSchema["Tables"];
 type Row<T extends TableName> = PublicSchema["Tables"][T]["Row"];
 type Insert<T extends TableName> = PublicSchema["Tables"][T]["Insert"];
 type Update<T extends TableName> = PublicSchema["Tables"][T]["Update"];
+
+/** Column names of a table — used to type `orderBy` and `filters`. */
+export type Column<T extends TableName> = Extract<keyof Row<T>, string>;
 
 /**
  * Loosely-typed view of the client. The generated Supabase types cannot infer
@@ -29,12 +32,12 @@ type UntypedQuery = {
 
 const db = supabase as unknown as { from: (table: string) => UntypedQuery };
 
-export type ListOptions = {
-  orderBy?: string;
+export type ListOptions<T extends TableName> = {
+  orderBy?: Column<T>;
   ascending?: boolean;
   limit?: number;
-  /** Simple equality filters, e.g. { type: "expense" } */
-  filters?: Record<string, string | number | boolean | null>;
+  /** Simple equality filters, e.g. { type: "expense" } — keys are checked against the table columns. */
+  filters?: Partial<Record<Column<T>, string | number | boolean | null>>;
 };
 
 /** Throws a readable error for any failed Supabase call. */
@@ -56,7 +59,7 @@ export async function currentUserId(): Promise<string> {
  */
 export function createRepository<T extends TableName>(table: T) {
   return {
-    async list(options: ListOptions = {}): Promise<Row<T>[]> {
+    async list(options: ListOptions<T> = {}): Promise<Row<T>[]> {
       let query = db.from(table).select("*");
       for (const [key, value] of Object.entries(options.filters ?? {})) {
         query = value === null ? query.is(key, null) : query.eq(key, value);

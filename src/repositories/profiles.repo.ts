@@ -1,4 +1,4 @@
-import { supabase } from "@/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { currentUserId } from "./base.repo";
 import type { Profile, ProfileUpdate, UserSettings, UserSettingsUpdate } from "@/types/database";
 

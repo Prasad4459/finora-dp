@@ -1,4 +1,4 @@
-import { Plus, PieChart, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, PieChart, AlertTriangle, Trash2, Pencil } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/lib/format";
+import { budgetProgress } from "@/services/finance";
 import { cn } from "@/lib/utils";
 import { useFinance } from "@/store/finance-store";
 
 
 export function Budget() {
-  const { budgets, openDialog, removeBudget } = useFinance();
+  const { budgets, openDialog, openEditDialog, removeBudget } = useFinance();
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
   const totalBudget = budgets.reduce((s, b) => s + b.budget, 0);
   const overspent = budgets.filter((b) => b.spent > b.budget).length;
@@ -41,15 +42,15 @@ export function Budget() {
         </CardHeader>
         <CardContent className="grid gap-5 sm:grid-cols-2">
           {budgets.map((b) => {
-            const pct = Math.min(Math.round((b.spent / b.budget) * 100), 130);
-            const over = b.spent > b.budget;
+            const { pct, over } = budgetProgress(b);
             return (
-              <div key={b.name}>
+              <div key={b.id}>
                 <div className="flex items-center justify-between text-sm">
                   <div className="font-medium">{b.name}</div>
                   <div className="flex items-center gap-1">
                     {over && <Badge variant="destructive" className="text-[10px]">Over budget</Badge>}
-                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeBudget(b.name)}><Trash2 className="h-3 w-3" /></Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog({ kind: "budget", entity: b })}><Pencil className="h-3 w-3" /></Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeBudget(b.id)}><Trash2 className="h-3 w-3" /></Button>
                   </div>
                 </div>
                 <div className="mt-1 flex items-baseline justify-between text-xs text-muted-foreground">
