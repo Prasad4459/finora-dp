@@ -190,7 +190,7 @@ export function EntityDialogs({
     <>
       <FormDialog open={open === "account"} onClose={onClose} title={isEdit("account") ? "Edit account" : "Add account"} fields={accountFields} {...common("account")}
         onSubmit={(v) => {
-          const payload = { name: v.name, bank: v.bank, type: v.type, balance: Number(v.balance) };
+          const payload = { name: v.name, bank: v.bank, type: v.type, balance: Number(v.balance || 0) };
           isEdit("account") ? f.updateAccount(editId!, payload) : f.addAccount(payload);
         }}
       />
