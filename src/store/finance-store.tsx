@@ -279,15 +279,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return category.id;
   };
 
-  const resolveWalletId = (name?: string): string | null => {
-    if (!name || name === "—") return null;
-    const w = walletRows.find((x) => x.name.toLowerCase() === name.toLowerCase());
-    return w?.id ?? null;
+  // WALLET RESOLUTION IS UUID-ONLY.
+  // Transactions are never linked to an account by display name: a name lookup
+  // can silently return NULL, which produced ledger rows that moved no money.
+  const requireWalletId = (walletId: string | null | undefined, label = "Account"): string => {
+    const id = (walletId ?? "").trim();
+    if (!id) throw new Error("Select an account for this transaction.");
+    if (!walletRows.some((w) => w.id === id)) throw new Error(`${label} was not found`);
+    return id;
   };
 
-  const requireWalletId = (name: string, label: string): string => {
-    const id = resolveWalletId(name);
-    if (!id) throw new Error(`${label} account "${name}" was not found`);
+  /** Optional wallet link (bills, employer-funded contributions). Still validated. */
+  const optionalWalletId = (walletId?: string | null): string | null => {
+    const id = (walletId ?? "").trim();
+    if (!id) return null;
+    if (!walletRows.some((w) => w.id === id)) throw new Error("That account was not found");
     return id;
   };
 
@@ -325,7 +331,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     transaction_date: v.date || todayISODate(),
     payee: v.source,
     category_id: await resolveCategoryId(v.category, "income"),
-    wallet_id: resolveWalletId(v.account),
+    wallet_id: requireWalletId(v.walletId, "Account"),
     is_recurring: v.recurring,
   });
 
@@ -336,7 +342,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     payee: v.merchant,
     payment_method: v.method,
     category_id: await resolveCategoryId(v.category, "expense"),
-    wallet_id: resolveWalletId(v.account),
+    wallet_id: requireWalletId(v.walletId, "Account"),
   });
 
   const numOrNull = (v: unknown) => {
@@ -391,7 +397,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       // bill is also linked to the shared categories table.
       notes: v.category,
       category_id: await resolveCategoryId(v.category, "expense"),
-      wallet_id: resolveWalletId(v.account),
+      wallet_id: optionalWalletId(v.walletId),
       description: v.description || null,
       frequency,
       is_recurring: frequency !== "one_time",
