@@ -197,11 +197,36 @@ export function computeTotals(input: {
   };
 }
 
+/** One scored component of the health score. */
+export type HealthPillar = {
+  key: "savings" | "debt" | "emergency";
+  label: string;
+  points: number;
+  max: number;
+  /** points ÷ max × 100 — how well this single area is doing. */
+  pct: number;
+  detail: string;
+};
+
+export type HealthScore = {
+  score: number;
+  label: string;
+  runwayMonths: number;
+  pillars: HealthPillar[];
+  strongest: HealthPillar;
+  weakest: HealthPillar;
+  /** Share of assets + balance that is invested — informational, not scored. */
+  investedShare: number;
+  /** True when there is simply not enough data for the score to mean anything. */
+  insufficientData: boolean;
+};
+
 /**
  * 0–100 financial health score built from savings rate, debt load and how many
- * months of expenses the liquid balance covers.
+ * months of expenses the liquid balance covers. The weights are unchanged
+ * (40 / 30 / 30) — they are only surfaced per area so the score is explainable.
  */
-export function computeHealthScore(t: FinanceTotals): { score: number; label: string; runwayMonths: number } {
+export function computeHealthScore(t: FinanceTotals): HealthScore {
   const savingsPoints = Math.max(0, Math.min(40, Math.round((t.savingsRate / 50) * 40)));
   const base = t.totalAssets + t.totalBalance;
   const debtRatio = base > 0 ? safeDiv(t.totalDebt, base) : t.totalDebt > 0 ? 1 : 0;
@@ -210,7 +235,57 @@ export function computeHealthScore(t: FinanceTotals): { score: number; label: st
   const runwayPoints = Math.max(0, Math.min(30, Math.round((runwayMonths / 6) * 30)));
   const score = Math.max(0, Math.min(100, savingsPoints + debtPoints + runwayPoints));
   const label = score >= 75 ? "Strong" : score >= 50 ? "Good" : score >= 30 ? "Fair" : "Needs work";
-  return { score, label, runwayMonths: Number(runwayMonths.toFixed(1)) };
+
+  const pillars: HealthPillar[] = [
+    {
+      key: "savings",
+      label: "Savings health",
+      points: savingsPoints,
+      max: 40,
+      pct: Math.round((savingsPoints / 40) * 100),
+      detail: `${t.savingsRate}% savings rate this month`,
+    },
+    {
+      key: "debt",
+      label: "Debt health",
+      points: debtPoints,
+      max: 30,
+      pct: Math.round((debtPoints / 30) * 100),
+      detail:
+        base > 0
+          ? `Debt is ${Math.round(debtRatio * 100)}% of what you own`
+          : t.totalDebt > 0
+            ? "Debt with no recorded assets"
+            : "No debt recorded",
+    },
+    {
+      key: "emergency",
+      label: "Emergency fund",
+      points: runwayPoints,
+      max: 30,
+      pct: Math.round((runwayPoints / 30) * 100),
+      detail:
+        t.monthExpenses > 0
+          ? `${runwayMonths.toFixed(1)} months of expenses covered`
+          : "No expenses recorded to measure runway",
+    },
+  ];
+
+  const ranked = [...pillars].sort((a, b) => b.pct - a.pct);
+  const ownedBase = t.totalAssets + t.totalBalance;
+
+  return {
+    score,
+    label,
+    runwayMonths: Number(runwayMonths.toFixed(1)),
+    pillars,
+    strongest: ranked[0],
+    weakest: ranked[ranked.length - 1],
+    investedShare: ownedBase > 0 ? Math.round(safeDiv(t.totalInvestments, ownedBase) * 100) : 0,
+    // Nothing owned, owed, earned or spent — a score would be meaningless.
+    insufficientData:
+      ownedBase === 0 && t.totalDebt === 0 && t.monthIncome === 0 && t.monthExpenses === 0,
+  };
 }
 
 /** Guarded against a zero / missing budget so it can never produce NaN. */

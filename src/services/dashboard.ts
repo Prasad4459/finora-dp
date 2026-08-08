@@ -7,7 +7,7 @@ import { netWorthChange, type MonthMetrics } from "@/services/finance";
 
 export type MonthSeries = Array<{ ref: MonthRef; metrics: MonthMetrics }>;
 
-export type CashFlowPoint = { month: string; income: number; expense: number };
+export type CashFlowPoint = { month: string; income: number; expense: number; savings: number };
 export type NetWorthPoint = { month: string; value: number };
 export type BreakdownSlice = { name: string; value: number; color: string };
 
@@ -16,6 +16,7 @@ export const buildCashFlowSeries = (series: MonthSeries): CashFlowPoint[] =>
     month: monthShortLabel(ref),
     income: metrics.grossIncome,
     expense: metrics.consumptionExpense,
+    savings: metrics.savings,
   }));
 
 /**
@@ -47,3 +48,10 @@ export function buildBreakdown(
 /** Total of a breakdown — computed once instead of per rendered row. */
 export const breakdownTotal = (slices: BreakdownSlice[]) =>
   slices.reduce((s, c) => s + c.value, 0);
+
+/**
+ * Month-over-month change as a percentage. Returns null when the previous
+ * month has nothing to compare against — a percentage off zero is meaningless.
+ */
+export const changePct = (current: number, previous: number): number | null =>
+  previous > 0 ? Math.round(((current - previous) / previous) * 100) : null;
