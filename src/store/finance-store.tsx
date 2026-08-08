@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { EntityDialogs } from "@/components/forms/entity-dialogs";
-import { categoriesRepo } from "@/repositories";
+import { assetsRepo, categoriesRepo } from "@/repositories";
 import { financeKeys } from "@/hooks/query-keys";
 import { errorMessage } from "@/hooks/use-entity-mutation";
 import { useWallets } from "@/hooks/use-wallets";
@@ -18,6 +18,7 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
 import { frequencyFromLabel, nextDueDate } from "@/services/bills";
+import { instrumentMeta } from "@/services/instruments";
 import { useBillReminders } from "@/hooks/use-bill-reminders";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import {
@@ -51,7 +52,13 @@ import type {
 export type AccountInput = Omit<Account, "id" | "icon" | "color" | "updated">;
 export type IncomeInput = Omit<Income, "id">;
 export type ExpenseInput = Omit<Expense, "id">;
-export type AssetInput = Omit<Asset, "id">;
+export type AssetInput = Omit<Asset, "id"> & {
+  /** Wallet UUID that funds the purchase. When present, the holding is created
+   *  through the ledger (an investment transaction debits this account). */
+  fundingWalletId?: string;
+  /** EPF / NPS: the asset grows with no wallet outflow. */
+  employerFunded?: boolean;
+};
 export type LiabilityInput = Omit<Liability, "id" | "remaining" | "status">;
 export type GoalInput = { name: string; iconKey: string; target: number; current: number; date: string };
 export type BudgetInput = { name: string; budget: number; spent?: number };
@@ -350,23 +357,44 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return v === undefined || v === null || v === "" || !Number.isFinite(n) ? null : n;
   };
 
-  const assetPayload = (v: AssetInput) => ({
+  // UNIT-BASED VALUATION IS DERIVED, NEVER DOUBLE-ENTERED.
+  // For an instrument priced per unit, current value = units × NAV. The NAV
+  // defaults to the average cost (purchase ÷ units) so a fresh holding shows
+  // value == invested and zero gain until a real price is recorded.
+  const unitValuation = (v: AssetInput) => {
+    const meta = instrumentMeta(v.type);
+    const units = numOrNull(v.units);
+    let avgCost = numOrNull(v.avgCost);
+    let lastPrice = numOrNull(v.lastPrice);
+    let current = Number(v.current || 0) || Number(v.purchase || 0);
+    if (meta.units && units && units > 0) {
+      avgCost = avgCost ?? Number((Number(v.purchase || 0) / units).toFixed(4));
+      lastPrice = lastPrice ?? avgCost;
+      current = Math.round(units * lastPrice);
+    }
+    return { units, avgCost, lastPrice, current };
+  };
+
+  const assetPayload = (v: AssetInput) => {
+    const { units, avgCost, lastPrice, current } = unitValuation(v);
+    return {
     name: v.name,
     type: assetTypeFromLabel(v.type),
     purchase_value: v.purchase,
-    current_value: v.current,
+    current_value: current,
     purchase_date: v.date || todayISODate(),
     // Investment facet — only the fields the chosen instrument actually needs.
-    units: numOrNull(v.units),
-    avg_cost: numOrNull(v.avgCost),
-    last_price: numOrNull(v.lastPrice),
+    units,
+    avg_cost: avgCost,
+    last_price: lastPrice,
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,
     maturity_value: numOrNull(v.maturityValue),
     folio_number: v.folio || null,
     institution: v.institution || null,
-  });
+    };
+  };
 
   const liabilityPayload = (v: LiabilityInput) => ({
     name: v.name,
@@ -632,7 +660,46 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         } as Omit<TransactionInsert, "user_id">);
       }),
 
-    addAsset: (v) => assetsData.create.mutate(assetPayload(v)),
+    // ADDING AN INVESTMENT IS A LEDGER EVENT.
+    // When a funding account is chosen, the holding is NOT written with a
+    // balance of its own: an investment transaction is created and the
+    // database trigger debits the wallet and grows the asset. That keeps the
+    // ledger the single source of truth for both sides of the purchase.
+    addAsset: (v) =>
+      run(async () => {
+        const meta = instrumentMeta(v.type);
+        const funded = Boolean(v.fundingWalletId) || Boolean(v.employerFunded);
+        if (!funded || !meta.investment) {
+          assetsData.create.mutate(assetPayload(v));
+          return;
+        }
+        const walletId = v.employerFunded
+          ? null
+          : requireWalletId(v.fundingWalletId, "Funding account");
+        const { units, avgCost, lastPrice } = unitValuation(v);
+        const categoryId = await resolveCategoryId("Investment", "expense");
+        const asset = await assetsRepo.create({
+          ...assetPayload(v),
+          purchase_value: 0,
+          current_value: 0,
+          units: units ? 0 : null,
+          avg_cost: null,
+          last_price: lastPrice,
+        });
+        createTx({
+          type: "investment",
+          amount: Number(v.purchase || 0),
+          transaction_date: v.date || todayISODate(),
+          wallet_id: walletId,
+          asset_id: asset.id,
+          payee: v.name,
+          units: units ?? null,
+          price_per_unit: avgCost,
+          category_id: categoryId,
+          notes: v.employerFunded ? "Employer contribution" : null,
+        } as Omit<TransactionInsert, "user_id">);
+        await qc.invalidateQueries({ queryKey: financeKeys.assets });
+      }),
     updateAsset: (id, v) => assetsData.update.mutate({ id, values: assetPayload(v) }),
     removeAsset: (id) => assetsData.remove.mutate(id),
 
