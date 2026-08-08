@@ -230,6 +230,24 @@ export function EntityDialogs({
           isEdit("bill") ? f.updateBill(editId!, payload) : f.addBill(payload);
         }}
       />
+      <FormDialog open={open === "transfer"} onClose={onClose} title="Transfer between accounts" fields={transferFields}
+        onSubmit={(v) => f.addTransfer({ from: v.from, to: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+      />
+      <FormDialog open={open === "investment"} onClose={onClose} title="Record investment" fields={investmentFields}
+        onSubmit={(v) => f.addInvestment({ asset: v.asset, account: v.account, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+      />
+      <FormDialog open={open === "dividend"} onClose={onClose} title="Record dividend" fields={dividendFields}
+        onSubmit={(v) => f.addDividend({ source: v.source, account: v.account, amount: Number(v.amount), date: v.date || today })}
+      />
+      <FormDialog open={open === "refund"} onClose={onClose} title="Record refund" fields={refundFields}
+        onSubmit={(v) => f.addRefund({ merchant: v.merchant, category: v.category, account: v.account, amount: Number(v.amount), date: v.date || today })}
+      />
+      <FormDialog open={open === "emi"} onClose={onClose} title="Record EMI payment" fields={emiFields}
+        onSubmit={(v) => f.addEmiPayment({ liability: v.liability, account: v.account, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
+      />
+      <FormDialog open={open === "contribution"} onClose={onClose} title="Add to goal" fields={contributionFields}
+        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, account: v.account, amount: Number(v.amount), date: v.date || today })}
+      />
     </>
   );
 }
