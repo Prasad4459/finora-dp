@@ -157,8 +157,8 @@ function DashboardInner() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total balance" value={currency(totalBalance)} delta={`Across ${accounts.length} accounts`} icon={Wallet} />
         <StatCard label="Net worth" value={currency(netWorth)} delta="Assets − Liabilities" icon={TrendingUp} tone="positive" />
-        <StatCard label="Monthly income" value={currency(monthIncome)} delta={`${incomes.length} entries`} icon={ArrowDownCircle} tone="positive" />
-        <StatCard label="Monthly expenses" value={currency(monthExpenses)} delta={`${expenses.length} entries`} icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Monthly income" value={currency(monthIncome)} delta="Salary, dividends & other credits" icon={ArrowDownCircle} tone="positive" />
+        <StatCard label="Monthly expenses" value={currency(monthExpenses)} delta="Spending + EMI interest − refunds" icon={ArrowUpCircle} tone="negative" />
         <StatCard label="Savings rate" value={`${savingsRate}%`} delta={savingsRate >= 40 ? "Healthy — above 40%" : "Aim for 40%+"} icon={PiggyBank} tone={savingsRate >= 40 ? "positive" : "neutral"} />
         <StatCard label="Total investments" value={currency(totalInvestments)} delta="MF, Stocks, PPF, EPF" icon={TrendingUp} />
         <StatCard label="Total debt" value={currency(totalDebt)} delta={`${liabilities.length} liabilities`} icon={CreditCard} tone="negative" />
@@ -369,14 +369,14 @@ function DashboardInner() {
             <div className="flex items-end gap-2">
               <div className="text-5xl font-semibold tracking-tight">{healthScore}</div>
               <div className="pb-1 text-sm text-muted-foreground">/ 100</div>
-              <Badge variant="secondary" className="ml-auto">Good</Badge>
+              <Badge variant="secondary" className="ml-auto">{health.label}</Badge>
             </div>
             <Progress value={healthScore} className="mt-4 h-2" />
             <ul className="mt-4 space-y-2 text-xs">
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Savings rate</span><span className="font-medium text-primary">Excellent</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Debt-to-income</span><span className="font-medium">Healthy</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Emergency runway</span><span className="font-medium">7.6 months</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Investment diversity</span><span className="font-medium">Balanced</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Savings rate</span><span className="font-medium text-primary">{savingsRate}%</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Monthly cash outflow</span><span className="font-medium">{currency(totals.monthCashOutflow)}</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Emergency runway</span><span className="font-medium">{health.runwayMonths} months</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Invested this month</span><span className="font-medium">{currency(totals.monthInvested)}</span></li>
             </ul>
           </CardContent>
         </Card>
