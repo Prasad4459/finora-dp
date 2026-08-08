@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatINR } from "@/lib/format";
-import { budgetProgress } from "@/services/finance";
+import { budgetProgress, percentOf } from "@/services/finance";
 import { cn } from "@/lib/utils";
 import { useFinance } from "@/store/finance-store";
 
@@ -15,7 +15,10 @@ export function Budget() {
   const { budgets, openDialog, openEditDialog, removeBudget } = useFinance();
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
   const totalBudget = budgets.reduce((s, b) => s + b.budget, 0);
-  const overspent = budgets.filter((b) => b.spent > b.budget).length;
+  const overspent = budgets.filter((b) => budgetProgress(b).over).length;
+  // Budgets are grouped by their OWN period, never by the current month.
+  const periods = [...new Set(budgets.map((b) => b.periodLabel))];
+  const periodTitle = periods.length === 1 ? ` — ${periods[0]}` : "";
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
@@ -29,7 +32,7 @@ export function Budget() {
         <StatCard
           label="Spent so far"
           value={formatINR(totalSpent)}
-          delta={`${Math.round((totalSpent / totalBudget) * 100)}% of budget used`}
+          delta={`${percentOf(totalSpent, totalBudget)}% of budget used`}
           tone={totalSpent > totalBudget ? "negative" : "neutral"}
           icon={PieChart}
         />
@@ -38,15 +41,23 @@ export function Budget() {
 
       <Card className="mt-6 border-border/70">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Category budgets — July 2026</CardTitle>
+          <CardTitle className="text-base font-semibold">Category budgets{periodTitle}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-5 sm:grid-cols-2">
+          {budgets.length === 0 && (
+            <p className="text-sm text-muted-foreground">No budgets yet. Set one to start tracking.</p>
+          )}
           {budgets.map((b) => {
             const { pct, over } = budgetProgress(b);
             return (
               <div key={b.id}>
                 <div className="flex items-center justify-between text-sm">
-                  <div className="font-medium">{b.name}</div>
+                  <div className="font-medium">
+                    {b.name}
+                    {periods.length > 1 && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">{b.periodLabel}</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
                     {over && <Badge variant="destructive" className="text-[10px]">Over budget</Badge>}
                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog({ kind: "budget", entity: b })}><Pencil className="h-3 w-3" /></Button>
