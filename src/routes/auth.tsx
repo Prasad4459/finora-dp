@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
@@ -28,6 +35,8 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"auth" | "forgot">("auth");
   const [sent, setSent] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [currency, setCurrency] = useState("INR");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -46,11 +55,16 @@ function AuthPage() {
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
+    if (fullName.trim().length < 2) return toast.error("Please enter your full name.");
+    if (password.length < 8) return toast.error("Password must be at least 8 characters.");
     setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin + "/dashboard" },
+      options: {
+        emailRedirectTo: window.location.origin + "/dashboard",
+        data: { full_name: fullName.trim(), currency },
+      },
     });
     setLoading(false);
     if (error) return toast.error(error.message);
@@ -156,8 +170,24 @@ function AuthPage() {
 
             <TabsContent value="signup">
               <form onSubmit={signUp} className="mt-4 space-y-4">
+                <Field label="Full name" value={fullName} onChange={setFullName} type="text" />
                 <Field label="Email" value={email} onChange={setEmail} type="email" />
                 <Field label="Password" value={password} onChange={setPassword} type="password" />
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INR">INR (₹)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="AED">AED (د.إ)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Creating…" : "Create account"}
                 </Button>
