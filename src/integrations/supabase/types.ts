@@ -860,6 +860,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assert_same_owner: {
+        Args: { _id: string; _label: string; _owner: string; _table: string }
+        Returns: undefined
+      }
       pay_bill_occurrence: {
         Args: {
           _amount: number
