@@ -14,6 +14,10 @@ export const transactionsRepo = {
   listByType: (type: TransactionType, limit = 100) =>
     repo.list({ filters: { type }, orderBy: "transaction_date", limit }),
 
+  /** Every ledger row linked to one holding (used before removing an asset). */
+  listByAsset: (assetId: string) =>
+    repo.list({ filters: { asset_id: assetId }, orderBy: "transaction_date" }),
+
   /**
    * Keyset-free offset pagination. Never loads the whole history into the
    * browser; callers request one page at a time.
