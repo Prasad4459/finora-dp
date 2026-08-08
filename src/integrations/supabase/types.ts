@@ -14,50 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_valuations: {
+        Row: {
+          as_of: string
+          asset_id: string
+          created_at: string
+          id: string
+          source: string
+          units: number | null
+          updated_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          as_of?: string
+          asset_id: string
+          created_at?: string
+          id?: string
+          source?: string
+          units?: number | null
+          updated_at?: string
+          user_id: string
+          value?: number
+        }
+        Update: {
+          as_of?: string
+          asset_id?: string
+          created_at?: string
+          id?: string
+          source?: string
+          units?: number | null
+          updated_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_valuations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
+          avg_cost: number | null
+          compounding: string | null
           created_at: string
           current_value: number
+          folio_number: string | null
           id: string
           institution: string | null
+          interest_rate: number | null
+          is_active: boolean
+          last_price: number | null
+          last_price_at: string | null
+          linked_wallet_id: string | null
+          maturity_date: string | null
+          maturity_value: number | null
           name: string
           notes: string | null
           purchase_date: string | null
           purchase_value: number
           quantity: number | null
           type: Database["public"]["Enums"]["asset_type"]
+          units: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          avg_cost?: number | null
+          compounding?: string | null
           created_at?: string
           current_value?: number
+          folio_number?: string | null
           id?: string
           institution?: string | null
+          interest_rate?: number | null
+          is_active?: boolean
+          last_price?: number | null
+          last_price_at?: string | null
+          linked_wallet_id?: string | null
+          maturity_date?: string | null
+          maturity_value?: number | null
           name: string
           notes?: string | null
           purchase_date?: string | null
           purchase_value?: number
           quantity?: number | null
           type: Database["public"]["Enums"]["asset_type"]
+          units?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          avg_cost?: number | null
+          compounding?: string | null
           created_at?: string
           current_value?: number
+          folio_number?: string | null
           id?: string
           institution?: string | null
+          interest_rate?: number | null
+          is_active?: boolean
+          last_price?: number | null
+          last_price_at?: string | null
+          linked_wallet_id?: string | null
+          maturity_date?: string | null
+          maturity_value?: number | null
           name?: string
           notes?: string | null
           purchase_date?: string | null
           purchase_value?: number
           quantity?: number | null
           type?: Database["public"]["Enums"]["asset_type"]
+          units?: number | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assets_linked_wallet_id_fkey"
+            columns: ["linked_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bill_payments: {
         Row: {
@@ -327,6 +412,69 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      investment_contributions: {
+        Row: {
+          amount: number
+          asset_id: string
+          auto_debit: boolean
+          created_at: string
+          day_of_month: number | null
+          frequency: Database["public"]["Enums"]["bill_frequency"]
+          id: string
+          next_due_date: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount?: number
+          asset_id: string
+          auto_debit?: boolean
+          created_at?: string
+          day_of_month?: number | null
+          frequency?: Database["public"]["Enums"]["bill_frequency"]
+          id?: string
+          next_due_date?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          asset_id?: string
+          auto_debit?: boolean
+          created_at?: string
+          day_of_month?: number | null
+          frequency?: Database["public"]["Enums"]["bill_frequency"]
+          id?: string
+          next_due_date?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_contributions_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_contributions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       liabilities: {
         Row: {
@@ -740,6 +888,16 @@ export type Database = {
         | "bank"
         | "cash"
         | "other"
+        | "etf"
+        | "bond"
+        | "reit"
+        | "invit"
+        | "recurring_deposit"
+        | "sukanya_samriddhi"
+        | "nsc"
+        | "kvp"
+        | "scss"
+        | "post_office"
       bill_frequency:
         | "one_time"
         | "weekly"
@@ -923,6 +1081,16 @@ export const Constants = {
         "bank",
         "cash",
         "other",
+        "etf",
+        "bond",
+        "reit",
+        "invit",
+        "recurring_deposit",
+        "sukanya_samriddhi",
+        "nsc",
+        "kvp",
+        "scss",
+        "post_office",
       ],
       bill_frequency: [
         "one_time",
