@@ -14,7 +14,9 @@ import { useGoals } from "@/hooks/use-goals";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useBills } from "@/hooks/use-bills";
 import { useNotifications } from "@/hooks/use-notifications";
-import { computeTotals, currentMonthKey, isInMonth, type FinanceTotals } from "@/services/finance";
+import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
+import { computeTotals, type FinanceTotals } from "@/services/finance";
+import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import { toTransactionView, type TransactionView } from "@/lib/transaction-view";
 import {
   assetTypeFromLabel,
@@ -56,7 +58,7 @@ export type TransferInput = { from: string; to: string; amount: number; date: st
 export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
 export type DividendInput = { source: string; account: string; amount: number; date: string };
 export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
-export type ContributionInput = { goal: string; account: string; amount: number; date: string };
+export type ContributionInput = { goal: string; account: string; to: string; amount: number; date: string };
 export type EmiInput = {
   liability: string;
   account: string;
@@ -80,6 +82,8 @@ export type EditTarget =
 type Ctx = {
   loading: boolean;
   totals: FinanceTotals;
+  /** Server-side aggregates: the only valid source of financial totals. */
+  summary: FinanceSummary;
   /** Unified ledger — every supported transaction type, newest first. */
   transactions: TransactionView[];
   hasMoreTransactions: boolean;
