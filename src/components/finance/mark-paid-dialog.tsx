@@ -58,7 +58,12 @@ export function MarkPaidDialog({
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
               <SelectContent>
                 {wallets.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                  <SelectItem key={w.id} value={w.id}>
+                    <span className="flex w-full items-center justify-between gap-3">
+                      <span>{w.name}</span>
+                      <span className="text-xs text-muted-foreground">{formatINR(Number(w.balance))}</span>
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

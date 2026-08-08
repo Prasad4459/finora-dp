@@ -176,6 +176,7 @@ export const toIncome = (t: Transaction, categoryName: string, walletName: strin
   source: t.payee ?? "—",
   category: categoryName,
   account: walletName,
+  walletId: t.wallet_id,
   amount: Number(t.amount),
   recurring: t.is_recurring,
 });
@@ -186,6 +187,7 @@ export const toExpense = (t: Transaction, categoryName: string, walletName: stri
   merchant: t.payee ?? "—",
   category: categoryName,
   account: walletName,
+  walletId: t.wallet_id,
   method: t.payment_method ?? "UPI",
   amount: Number(t.amount),
 });

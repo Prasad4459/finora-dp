@@ -62,17 +62,18 @@ export type BillInput = {
   amount: number;
   iconKey: string;
   frequency?: string;
-  account?: string;
+  /** Wallet UUID (optional — a bill may have no default account). */
+  walletId?: string;
   description?: string;
   reminderEnabled?: boolean;
   reminderDays?: number | string;
 };
 
-export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
+export type TransferInput = { fromWalletId: string; toWalletId: string; amount: number; date: string; notes?: string };
 export type InvestmentInput = {
   asset: string;
-  /** Empty when the contribution is employer-funded (EPF / NPS). */
-  account?: string;
+  /** Wallet UUID. Empty when the contribution is employer-funded (EPF / NPS). */
+  walletId?: string;
   amount: number;
   date: string;
   notes?: string;
@@ -84,7 +85,7 @@ export type InvestmentInput = {
 /** Selling / withdrawing an investment: cash returns to a wallet. */
 export type RedemptionInput = {
   asset: string;
-  account: string;
+  walletId: string;
   amount: number;
   date: string;
   units?: number;
@@ -93,18 +94,18 @@ export type RedemptionInput = {
 /** A recurring contribution schedule (SIP, RD instalment, yearly deposit). */
 export type SipInput = {
   asset: string;
-  account: string;
+  walletId: string;
   amount: number;
   frequency: string;
   nextDue: string;
   autoDebit?: boolean;
 };
-export type DividendInput = { source: string; account: string; amount: number; date: string };
-export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
-export type ContributionInput = { goal: string; account: string; to: string; amount: number; date: string };
+export type DividendInput = { source: string; walletId: string; amount: number; date: string };
+export type RefundInput = { merchant: string; category: string; walletId: string; amount: number; date: string };
+export type ContributionInput = { goal: string; fromWalletId: string; toWalletId: string; amount: number; date: string };
 export type EmiInput = {
   liability: string;
-  account: string;
+  walletId: string;
   amount: number;
   principal: number;
   interest: number;
@@ -278,15 +279,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return category.id;
   };
 
-  const resolveWalletId = (name?: string): string | null => {
-    if (!name || name === "—") return null;
-    const w = walletRows.find((x) => x.name.toLowerCase() === name.toLowerCase());
-    return w?.id ?? null;
+  // WALLET RESOLUTION IS UUID-ONLY.
+  // Transactions are never linked to an account by display name: a name lookup
+  // can silently return NULL, which produced ledger rows that moved no money.
+  const requireWalletId = (walletId: string | null | undefined, label = "Account"): string => {
+    const id = (walletId ?? "").trim();
+    if (!id) throw new Error("Select an account for this transaction.");
+    if (!walletRows.some((w) => w.id === id)) throw new Error(`${label} was not found`);
+    return id;
   };
 
-  const requireWalletId = (name: string, label: string): string => {
-    const id = resolveWalletId(name);
-    if (!id) throw new Error(`${label} account "${name}" was not found`);
+  /** Optional wallet link (bills, employer-funded contributions). Still validated. */
+  const optionalWalletId = (walletId?: string | null): string | null => {
+    const id = (walletId ?? "").trim();
+    if (!id) return null;
+    if (!walletRows.some((w) => w.id === id)) throw new Error("That account was not found");
     return id;
   };
 
@@ -324,7 +331,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     transaction_date: v.date || todayISODate(),
     payee: v.source,
     category_id: await resolveCategoryId(v.category, "income"),
-    wallet_id: resolveWalletId(v.account),
+    wallet_id: requireWalletId(v.walletId, "Account"),
     is_recurring: v.recurring,
   });
 
@@ -335,7 +342,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     payee: v.merchant,
     payment_method: v.method,
     category_id: await resolveCategoryId(v.category, "expense"),
-    wallet_id: resolveWalletId(v.account),
+    wallet_id: requireWalletId(v.walletId, "Account"),
   });
 
   const numOrNull = (v: unknown) => {
@@ -390,7 +397,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       // bill is also linked to the shared categories table.
       notes: v.category,
       category_id: await resolveCategoryId(v.category, "expense"),
-      wallet_id: resolveWalletId(v.account),
+      wallet_id: optionalWalletId(v.walletId),
       description: v.description || null,
       frequency,
       is_recurring: frequency !== "one_time",
@@ -443,8 +450,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     // Transfer: one row, both legs. Never counted as income or expense.
     addTransfer: (v) =>
       run(async () => {
-        const from = requireWalletId(v.from, "Source");
-        const to = requireWalletId(v.to, "Destination");
+        const from = requireWalletId(v.fromWalletId, "Source account");
+        const to = requireWalletId(v.toWalletId, "Destination account");
         if (from === to) throw new Error("Source and destination must be different accounts");
         createTx({
           type: "transfer",
@@ -452,7 +459,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           transaction_date: v.date || todayISODate(),
           wallet_id: from,
           to_wallet_id: to,
-          payee: v.to,
+          payee: walletName(to),
           notes: v.notes || null,
         });
       }),
@@ -465,7 +472,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         // EMPLOYER-FUNDED CONTRIBUTIONS (EPF / NPS)
         // The asset grows but the user's bank balance never moved, so the
         // transaction carries no wallet: the trigger then skips the debit.
-        const walletId = v.employerFunded ? null : requireWalletId(v.account ?? "", "Source");
+        const walletId = v.employerFunded ? null : requireWalletId(v.walletId, "Source account");
         createTx({
           type: "investment",
           amount: v.amount,
@@ -494,7 +501,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "redemption",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Destination"),
+          wallet_id: requireWalletId(v.walletId, "Destination account"),
           asset_id: asset.id,
           payee: v.asset,
           units: v.units ?? null,
@@ -512,7 +519,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
         contributionsData.create.mutate({
           asset_id: asset.id,
-          wallet_id: resolveWalletId(v.account),
+          wallet_id: requireWalletId(v.walletId, "Debit account"),
           amount: v.amount,
           frequency: frequencyFromLabel(v.frequency || "Monthly"),
           next_due_date: v.nextDue || todayISODate(),
@@ -529,12 +536,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       run(async () => {
         const row = contributionsData.rows.find((c) => c.id === id);
         if (!row) throw new Error("Contribution schedule was not found");
+        // A scheduled contribution debits a real account; it can never post
+        // a wallet-less transaction.
+        const walletId = requireWalletId(row.wallet_id, "Debit account");
         const on = date || row.next_due_date?.slice(0, 10) || todayISODate();
         createTx({
           type: "investment",
           amount: Number(row.amount),
           transaction_date: on,
-          wallet_id: row.wallet_id,
+          wallet_id: walletId,
           asset_id: row.asset_id,
           payee: assetName(row.asset_id),
           category_id: await resolveCategoryId("Investment", "expense"),
@@ -553,7 +563,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "dividend",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Destination"),
+          wallet_id: requireWalletId(v.walletId, "Destination account"),
           payee: v.source,
           category_id: await resolveCategoryId("Dividend", "income"),
         }),
@@ -565,7 +575,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "refund",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Destination"),
+          wallet_id: requireWalletId(v.walletId, "Destination account"),
           payee: v.merchant,
           category_id: await resolveCategoryId(v.category || "Refund", "expense"),
         }),
@@ -585,7 +595,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "emi",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Source"),
+          wallet_id: requireWalletId(v.walletId, "Source account"),
           liability_id: liability.id,
           principal_amount: principal,
           interest_amount: interest,
@@ -605,8 +615,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       run(async () => {
         const goal = goalsData.rows.find((g) => g.name.toLowerCase() === v.goal.toLowerCase());
         if (!goal) throw new Error(`Goal "${v.goal}" was not found`);
-        const from = requireWalletId(v.account, "Source");
-        const to = requireWalletId(v.to, "Destination");
+        const from = requireWalletId(v.fromWalletId, "Source account");
+        const to = requireWalletId(v.toWalletId, "Destination account");
         if (from === to) throw new Error("Choose a different account to hold the goal money");
         createTx({
           type: "transfer",

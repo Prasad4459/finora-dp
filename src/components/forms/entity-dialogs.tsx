@@ -1,4 +1,4 @@
-import { FormDialog, type FieldDef } from "@/components/forms/form-dialog";
+import { FormDialog, type FieldDef, type SelectOption } from "@/components/forms/form-dialog";
 import {
   ACCOUNT_TYPES,
   ASSET_TYPES,
@@ -11,6 +11,7 @@ import {
   PAYMENT_METHODS,
 } from "@/constants/finance";
 import { todayISO } from "@/lib/date-in";
+import { formatINR } from "@/lib/format";
 import { FREQUENCY_LABEL, FREQUENCY_OPTIONS, type Frequency } from "@/services/bills";
 import { COMPOUNDING_OPTIONS, instrumentMeta, type InstrumentField } from "@/services/instruments";
 import { useFinance, type EditTarget } from "@/store/finance-store";
@@ -24,6 +25,9 @@ const todayDMY = () => {
 
 type Values = Record<string, string | boolean>;
 
+/** Shown whenever a money-moving transaction has no account selected. */
+const SELECT_ACCOUNT = "Select an account for this transaction.";
+
 /** Maps an entity being edited back onto the dialog field keys. */
 function initialFor(editing: EditTarget | null): Values | null {
   if (!editing) return null;
@@ -33,9 +37,9 @@ function initialFor(editing: EditTarget | null): Values | null {
     case "account":
       return { name: str("name"), bank: str("bank"), type: str("type"), balance: str("balance") };
     case "income":
-      return { source: str("source"), category: str("category"), account: str("account"), amount: str("amount"), date: str("date"), recurring: Boolean(e.recurring) };
+      return { source: str("source"), category: str("category"), walletId: str("walletId"), amount: str("amount"), date: str("date"), recurring: Boolean(e.recurring) };
     case "expense":
-      return { merchant: str("merchant"), category: str("category"), account: str("account"), method: str("method"), amount: str("amount"), date: str("date") };
+      return { merchant: str("merchant"), category: str("category"), walletId: str("walletId"), method: str("method"), amount: str("amount"), date: str("date") };
     case "asset":
       return {
         name: str("name"),
@@ -66,7 +70,7 @@ function initialFor(editing: EditTarget | null): Values | null {
         amount: str("amount"),
         due: str("due"),
         frequency: FREQUENCY_LABEL[(str("frequency") || "monthly") as Frequency] ?? "Monthly",
-        account: str("accountName"),
+        walletId: str("walletId"),
         description: str("description"),
         reminderEnabled: e.reminderEnabled !== false,
         reminderDays: str("reminderDays") || "3",
@@ -84,7 +88,25 @@ export function EntityDialogs({
   onClose: () => void;
 }) {
   const f = useFinance();
-  const accountNames = f.accounts.map((a) => a.name);
+  // WALLET SELECTION IS UUID-BASED.
+  // Transactions are never linked to an account by display name; the option
+  // value IS the wallet UUID stored on the transaction.
+  const walletOptions: SelectOption[] = f.accounts.map((a) => ({
+    value: a.id,
+    label: `${a.name} · ${a.type}`,
+    hint: formatINR(a.balance),
+  }));
+  const walletField = (key: string, label: string, extra: Partial<FieldDef> = {}): FieldDef =>
+    ({
+      key,
+      label,
+      type: "select",
+      options: walletOptions,
+      required: true,
+      placeholder: "Select account",
+      requiredMessage: SELECT_ACCOUNT,
+      ...extra,
+    }) as FieldDef;
   const assetNames = f.assets.map((a) => a.name);
   const liabilityNames = f.liabilities.map((l) => l.name);
   const goalNames = f.goals.map((g) => g.name);
@@ -111,7 +133,7 @@ export function EntityDialogs({
   const incomeFields: FieldDef[] = [
     { key: "source", label: "Source", type: "text", required: true },
     { key: "category", label: "Category", type: "select", options: INCOME_CATEGORIES as unknown as string[], required: true },
-    { key: "account", label: "Account", type: "text", placeholder: "e.g. HDFC •• 4021" },
+    walletField("walletId", "Account"),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
     { key: "recurring", label: "Recurring", type: "switch" },
@@ -120,7 +142,7 @@ export function EntityDialogs({
   const expenseFields: FieldDef[] = [
     { key: "merchant", label: "Merchant / Payee", type: "text", required: true },
     { key: "category", label: "Category", type: "select", options: EXPENSE_CATEGORIES as unknown as string[], required: true },
-    { key: "account", label: "Account", type: "text", placeholder: "e.g. HDFC •• 4021" },
+    walletField("walletId", "Account"),
     { key: "method", label: "Payment method", type: "select", options: PAYMENT_METHODS as unknown as string[] },
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
@@ -198,15 +220,15 @@ export function EntityDialogs({
     { key: "amount", label: "Expected amount (₹)", type: "number", required: true },
     { key: "due", label: "Next due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true },
     { key: "frequency", label: "Recurrence", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true },
-    { key: "account", label: "Pay from account", type: "select", options: accountNames },
+    walletField("walletId", "Pay from account", { required: false }),
     { key: "reminderEnabled", label: "Reminders", type: "switch", default: "true" },
     { key: "reminderDays", label: "Remind me (days before)", type: "number", default: "3" },
     { key: "description", label: "Notes", type: "textarea", placeholder: "Optional" },
   ];
 
   const transferFields: FieldDef[] = [
-    { key: "from", label: "From account", type: "select", options: accountNames, required: true },
-    { key: "to", label: "To account", type: "select", options: accountNames, required: true },
+    walletField("from", "From account"),
+    walletField("to", "To account"),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
     { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
@@ -215,7 +237,7 @@ export function EntityDialogs({
   const investmentFields: FieldDef[] = [
     { key: "asset", label: "Invest into (holding)", type: "select", options: assetNames, required: true },
     { key: "employerFunded", label: "Employer funded", type: "switch", hint: "EPF / NPS employer share — no money leaves your accounts" },
-    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true, showWhen: (v) => !v.employerFunded },
+    walletField("walletId", "Paid from account", { showWhen: (v) => !v.employerFunded }),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "units", label: "Units bought (optional)", type: "number" },
     { key: "pricePerUnit", label: "Price / NAV per unit (₹)", type: "number" },
@@ -225,7 +247,7 @@ export function EntityDialogs({
 
   const redemptionFields: FieldDef[] = [
     { key: "asset", label: "Sell / withdraw from", type: "select", options: assetNames, required: true },
-    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    walletField("walletId", "Credited to account"),
     { key: "units", label: "Units sold (optional)", type: "number" },
     { key: "amount", label: "Proceeds received (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
@@ -234,7 +256,7 @@ export function EntityDialogs({
 
   const sipFields: FieldDef[] = [
     { key: "asset", label: "Contribute to", type: "select", options: assetNames, required: true },
-    { key: "account", label: "Debit from account", type: "select", options: accountNames, required: true },
+    walletField("walletId", "Debit from account"),
     { key: "amount", label: "Instalment amount (₹)", type: "number", required: true },
     { key: "frequency", label: "Frequency", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true },
     { key: "nextDue", label: "Next due date", type: "date", default: today, required: true },
@@ -243,7 +265,7 @@ export function EntityDialogs({
 
   const dividendFields: FieldDef[] = [
     { key: "source", label: "Source", type: "text", required: true, placeholder: "e.g. TCS Dividend" },
-    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    walletField("walletId", "Credited to account"),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
   ];
@@ -251,14 +273,14 @@ export function EntityDialogs({
   const refundFields: FieldDef[] = [
     { key: "merchant", label: "Refunded by", type: "text", required: true },
     { key: "category", label: "Original category", type: "select", options: EXPENSE_CATEGORIES as unknown as string[] },
-    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    walletField("walletId", "Credited to account"),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
   ];
 
   const emiFields: FieldDef[] = [
     { key: "liability", label: "Loan / liability", type: "select", options: liabilityNames, required: true },
-    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    walletField("walletId", "Paid from account"),
     { key: "amount", label: "EMI amount (₹)", type: "number", required: true },
     { key: "principal", label: "Principal portion (₹)", type: "number" },
     { key: "interest", label: "Interest portion (₹)", type: "number" },
@@ -267,8 +289,8 @@ export function EntityDialogs({
 
   const contributionFields: FieldDef[] = [
     { key: "goal", label: "Goal", type: "select", options: goalNames, required: true },
-    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
-    { key: "to", label: "Held in account", type: "select", options: accountNames, required: true },
+    walletField("walletId", "Paid from account"),
+    walletField("to", "Held in account"),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
   ];
@@ -283,13 +305,13 @@ export function EntityDialogs({
       />
       <FormDialog open={open === "income"} onClose={onClose} title={isEdit("income") ? "Edit income" : "Add income"} fields={incomeFields} {...common("income")}
         onSubmit={(v) => {
-          const payload = { source: v.source, category: v.category, account: v.account || "—", amount: Number(v.amount), date: v.date || today, recurring: !!v.recurring };
+          const payload = { source: v.source, category: v.category, account: "", walletId: v.walletId, amount: Number(v.amount), date: v.date || today, recurring: !!v.recurring };
           isEdit("income") ? f.updateIncome(editId!, payload) : f.addIncome(payload);
         }}
       />
       <FormDialog open={open === "expense"} onClose={onClose} title={isEdit("expense") ? "Edit expense" : "Add expense"} fields={expenseFields} {...common("expense")}
         onSubmit={(v) => {
-          const payload = { merchant: v.merchant, category: v.category, account: v.account || "—", method: v.method || "UPI", amount: Number(v.amount), date: v.date || today };
+          const payload = { merchant: v.merchant, category: v.category, account: "", walletId: v.walletId, method: v.method || "UPI", amount: Number(v.amount), date: v.date || today };
           isEdit("expense") ? f.updateExpense(editId!, payload) : f.addExpense(payload);
         }}
       />
@@ -335,18 +357,29 @@ export function EntityDialogs({
       />
       <FormDialog open={open === "bill"} onClose={onClose} title={isEdit("bill") ? "Edit bill" : "Add bill"} fields={billFields} {...common("bill")}
         onSubmit={(v) => {
-          const payload = { name: v.name, category: v.category, iconKey: v.iconKey || "Receipt", amount: Number(v.amount), due: v.due || todayDMY() };
+          const payload = {
+            name: v.name,
+            category: v.category,
+            iconKey: v.iconKey || "Receipt",
+            amount: Number(v.amount),
+            due: v.due || todayDMY(),
+            frequency: v.frequency,
+            walletId: v.walletId || undefined,
+            description: v.description,
+            reminderEnabled: !!v.reminderEnabled,
+            reminderDays: v.reminderDays,
+          };
           isEdit("bill") ? f.updateBill(editId!, payload) : f.addBill(payload);
         }}
       />
       <FormDialog open={open === "transfer"} onClose={onClose} title="Transfer between accounts" fields={transferFields}
-        onSubmit={(v) => f.addTransfer({ from: v.from, to: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+        onSubmit={(v) => f.addTransfer({ fromWalletId: v.from, toWalletId: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
       />
       <FormDialog open={open === "investment"} onClose={onClose} title="Record investment" fields={investmentFields}
         onSubmit={(v) =>
           f.addInvestment({
             asset: v.asset,
-            account: v.account,
+            walletId: v.walletId,
             amount: Number(v.amount),
             date: v.date || today,
             notes: v.notes,
@@ -360,7 +393,7 @@ export function EntityDialogs({
         onSubmit={(v) =>
           f.addRedemption({
             asset: v.asset,
-            account: v.account,
+            walletId: v.walletId,
             amount: Number(v.amount),
             units: v.units ? Number(v.units) : undefined,
             date: v.date || today,
@@ -372,7 +405,7 @@ export function EntityDialogs({
         onSubmit={(v) =>
           f.addSip({
             asset: v.asset,
-            account: v.account,
+            walletId: v.walletId,
             amount: Number(v.amount),
             frequency: v.frequency || "Monthly",
             nextDue: v.nextDue || today,
@@ -381,16 +414,16 @@ export function EntityDialogs({
         }
       />
       <FormDialog open={open === "dividend"} onClose={onClose} title="Record dividend" fields={dividendFields}
-        onSubmit={(v) => f.addDividend({ source: v.source, account: v.account, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addDividend({ source: v.source, walletId: v.walletId, amount: Number(v.amount), date: v.date || today })}
       />
       <FormDialog open={open === "refund"} onClose={onClose} title="Record refund" fields={refundFields}
-        onSubmit={(v) => f.addRefund({ merchant: v.merchant, category: v.category, account: v.account, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addRefund({ merchant: v.merchant, category: v.category, walletId: v.walletId, amount: Number(v.amount), date: v.date || today })}
       />
       <FormDialog open={open === "emi"} onClose={onClose} title="Record EMI payment" fields={emiFields}
-        onSubmit={(v) => f.addEmiPayment({ liability: v.liability, account: v.account, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
+        onSubmit={(v) => f.addEmiPayment({ liability: v.liability, walletId: v.walletId, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
       />
       <FormDialog open={open === "contribution"} onClose={onClose} title="Add to goal" fields={contributionFields}
-        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, account: v.account, to: v.to, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, fromWalletId: v.walletId, toWalletId: v.to, amount: Number(v.amount), date: v.date || today })}
       />
     </>
   );
