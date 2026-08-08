@@ -160,7 +160,14 @@ export function EntityDialogs({
     purchase: { key: "purchase", label: "Invested amount (₹)", type: "number", required: true, showWhen: shows("purchase") },
     units: { key: "units", label: "Units held", type: "number", showWhen: shows("units") },
     avgCost: { key: "avgCost", label: "Average cost per unit (₹)", type: "number", showWhen: shows("avgCost") },
-    lastPrice: { key: "lastPrice", label: "Current price / NAV per unit (₹)", type: "number", showWhen: shows("lastPrice") },
+    lastPrice: {
+      key: "lastPrice",
+      label: "Current NAV / price PER UNIT (₹)",
+      type: "number",
+      placeholder: "Leave empty to use your average cost",
+      hint: "Per unit, not the total value. Current value = units × this price.",
+      showWhen: shows("lastPrice"),
+    },
     current: { key: "current", label: "Current value (₹)", type: "number", required: true, showWhen: shows("current") },
     rate: { key: "rate", label: "Interest rate (% p.a.)", type: "number", showWhen: shows("rate") },
     compounding: { key: "compounding", label: "Compounding", type: "select", options: COMPOUNDING_OPTIONS as unknown as string[], default: "Yearly", showWhen: shows("compounding") },
@@ -188,6 +195,17 @@ export function EntityDialogs({
     { key: "name", label: "Investment / asset name", type: "text", required: true },
     { key: "type", label: "Type", type: "select", options: ASSET_TYPES as unknown as string[], required: true },
     ...ASSET_FIELD_ORDER.map((k) => ASSET_FIELD_DEFS[k]),
+    // Funding the purchase from an account records it in the ledger, so the
+    // wallet is debited by the database trigger instead of drifting.
+    ...(isEdit("asset")
+      ? []
+      : [
+          walletField("fundingWalletId", "Funded from account (optional)", {
+            required: false,
+            placeholder: "Not funded from an account",
+            hint: "Debits this account and records an investment transaction. Leave empty for employer-funded or already-held investments.",
+          }),
+        ]),
   ];
 
   const liabilityFields: FieldDef[] = [
