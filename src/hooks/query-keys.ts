@@ -30,6 +30,8 @@ export const financeKeys = {
   budgets: ["budgets"] as const,
   bills: ["bills"] as const,
   billPayments: ["bill-payments"] as const,
+  /** Scheduled SIP / RD / yearly investment contributions. */
+  investmentContributions: ["investment-contributions"] as const,
   notifications: ["notifications"] as const,
   userSettings: ["user-settings"] as const,
   /** Dashboard-only 10-row window. Shares the "transactions" prefix so any
@@ -76,6 +78,8 @@ export function keysForTransaction(type?: TransactionType | null): readonly Quer
   if (!type) return FINANCE_DERIVED_KEYS;
   switch (type) {
     case "investment":
+      return [...TRANSACTION_BASE_KEYS, financeKeys.assets];
+    case "redemption":
       return [...TRANSACTION_BASE_KEYS, financeKeys.assets];
     case "emi":
       return [...TRANSACTION_BASE_KEYS, financeKeys.liabilities];
