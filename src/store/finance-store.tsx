@@ -18,6 +18,7 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
 import { frequencyFromLabel, nextDueDate } from "@/services/bills";
+import { instrumentMeta } from "@/services/instruments";
 import { useBillReminders } from "@/hooks/use-bill-reminders";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import {
