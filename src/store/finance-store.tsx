@@ -356,23 +356,44 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return v === undefined || v === null || v === "" || !Number.isFinite(n) ? null : n;
   };
 
-  const assetPayload = (v: AssetInput) => ({
+  // UNIT-BASED VALUATION IS DERIVED, NEVER DOUBLE-ENTERED.
+  // For an instrument priced per unit, current value = units × NAV. The NAV
+  // defaults to the average cost (purchase ÷ units) so a fresh holding shows
+  // value == invested and zero gain until a real price is recorded.
+  const unitValuation = (v: AssetInput) => {
+    const meta = instrumentMeta(v.type);
+    const units = numOrNull(v.units);
+    let avgCost = numOrNull(v.avgCost);
+    let lastPrice = numOrNull(v.lastPrice);
+    let current = Number(v.current || 0) || Number(v.purchase || 0);
+    if (meta.units && units && units > 0) {
+      avgCost = avgCost ?? Number((Number(v.purchase || 0) / units).toFixed(4));
+      lastPrice = lastPrice ?? avgCost;
+      current = Math.round(units * lastPrice);
+    }
+    return { units, avgCost, lastPrice, current };
+  };
+
+  const assetPayload = (v: AssetInput) => {
+    const { units, avgCost, lastPrice, current } = unitValuation(v);
+    return {
     name: v.name,
     type: assetTypeFromLabel(v.type),
     purchase_value: v.purchase,
-    current_value: v.current,
+    current_value: current,
     purchase_date: v.date || todayISODate(),
     // Investment facet — only the fields the chosen instrument actually needs.
-    units: numOrNull(v.units),
-    avg_cost: numOrNull(v.avgCost),
-    last_price: numOrNull(v.lastPrice),
+    units,
+    avg_cost: avgCost,
+    last_price: lastPrice,
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,
     maturity_value: numOrNull(v.maturityValue),
     folio_number: v.folio || null,
     institution: v.institution || null,
-  });
+    };
+  };
 
   const liabilityPayload = (v: LiabilityInput) => ({
     name: v.name,
