@@ -17,6 +17,9 @@ import { useFinance } from "@/store/finance-store";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
 import { toAccount, toAsset, toBill, toGoal, toIncome, toLiability } from "@/lib/finance-mappers";
 import { toTransactionView, type TransactionView } from "@/lib/transaction-view";
+import { classifyBills, type BillInput, type ClassifiedBill } from "@/services/bills";
+import { addMonths, todayISO } from "@/lib/date-in";
+import type { MonthMetrics } from "@/services/finance";
 
 /** Uniform status shape every dashboard widget consumes. */
 export type WidgetStatus = {
@@ -145,16 +148,90 @@ export function useGoalsWidget() {
 
 export function useBillsWidget() {
   const query = useQuery(billsQueryOptions);
-  const bills = useMemo(() => (query.data ?? []).map(toBill), [query.data]);
-  const total = useMemo(() => bills.reduce((s, b) => s + b.amount, 0), [bills]);
+  const outlook = useMemo(() => {
+    const rows = (query.data ?? []).map((row) => {
+      const bill = toBill(row);
+      return {
+        id: bill.id,
+        name: bill.name,
+        category: bill.category,
+        icon: bill.icon,
+        amount: bill.amount,
+        // toBill() formats the date for display; classification needs the ISO one.
+        dueISO: (row.due_date ?? "").slice(0, 10),
+        status: row.status,
+      };
+    });
+    return classifyBills(rows, todayISO());
+  }, [query.data]);
+
   return {
-    bills,
-    total,
-    count: bills.length,
+    /** Only genuinely upcoming bills: overdue, due today, or due within 14 days. */
+    bills: outlook.upcoming,
+    outlook,
+    total: outlook.total,
+    count: outlook.count,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
     hasData: query.data !== undefined,
     refetch: () => void query.refetch(),
+  };
+}
+
+export type DashboardBill = ClassifiedBill<BillInput & { name: string; category: string; icon: ReturnType<typeof toBill>["icon"] }>;
+
+/**
+ * Current vs previous IST month, straight from the server-side aggregates.
+ * Components never subtract months themselves.
+ */
+export function useMonthComparison(): {
+  month: MonthMetrics;
+  previousMonth: MonthMetrics;
+} {
+  const { summary } = useFinance();
+  const current = summary.current;
+  return useMemo(
+    () => ({
+      month: summary.metricsFor(current),
+      previousMonth: summary.metricsFor(addMonths(current, -1)),
+    }),
+    [summary.categoryRows, summary.isLoading, current.year, current.month],
+  );
+}
+
+/**
+ * Whether the user has recorded anything at all. Drives the getting-started
+ * experience instead of a wall of ₹0 and empty charts.
+ */
+export function useOnboardingState() {
+  const wallets = useQuery(walletsQueryOptions);
+  const assets = useQuery(assetsQueryOptions);
+  const liabilities = useQuery(liabilitiesQueryOptions);
+  const goals = useQuery(goalsQueryOptions);
+  const recent = useRecentTransactions();
+
+  const resolved =
+    wallets.data !== undefined &&
+    assets.data !== undefined &&
+    liabilities.data !== undefined &&
+    goals.data !== undefined &&
+    recent.rows !== undefined;
+
+  const counts = {
+    wallets: wallets.data?.length ?? 0,
+    assets: assets.data?.length ?? 0,
+    liabilities: liabilities.data?.length ?? 0,
+    goals: goals.data?.length ?? 0,
+    transactions: recent.rows?.length ?? 0,
+  };
+
+  return {
+    counts,
+    isLoading: !resolved && (wallets.isLoading || recent.isLoading),
+    isError: wallets.isError || assets.isError || liabilities.isError || goals.isError || recent.isError,
+    /** Nothing recorded anywhere yet. */
+    isNewUser:
+      resolved && Object.values(counts).every((n) => n === 0),
   };
 }
