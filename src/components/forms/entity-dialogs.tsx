@@ -351,6 +351,7 @@ export function EntityDialogs({
             compounding: v.compounding || null,
             maturityDate: v.maturityDate || null,
             maturityValue: num(v.maturityValue),
+            fundingWalletId: v.fundingWalletId || undefined,
           };
           isEdit("asset") ? f.updateAsset(editId!, payload) : f.addAsset(payload);
         }}
