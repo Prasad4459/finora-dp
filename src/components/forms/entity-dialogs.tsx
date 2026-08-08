@@ -126,12 +126,46 @@ export function EntityDialogs({
     { key: "date", label: "Date", type: "date", default: today },
   ];
 
+  // INSTRUMENT-AWARE ASSET FORM
+  // The visible fields come from the instrument metadata (services/instruments)
+  // — no component ever hard-codes "if FD then show rate".
+  const shows = (field: InstrumentField) => (v: Record<string, string | boolean>) =>
+    instrumentMeta(String(v.type ?? "")).fields.includes(field);
+
+  const ASSET_FIELD_DEFS: Record<InstrumentField, FieldDef> = {
+    institution: { key: "institution", label: "Institution / AMC", type: "text", placeholder: "e.g. HDFC AMC, SBI", showWhen: shows("institution") },
+    folio: { key: "folio", label: "Folio / Account number", type: "text", showWhen: shows("folio") },
+    purchase: { key: "purchase", label: "Invested amount (₹)", type: "number", required: true, showWhen: shows("purchase") },
+    units: { key: "units", label: "Units held", type: "number", showWhen: shows("units") },
+    avgCost: { key: "avgCost", label: "Average cost per unit (₹)", type: "number", showWhen: shows("avgCost") },
+    lastPrice: { key: "lastPrice", label: "Current price / NAV per unit (₹)", type: "number", showWhen: shows("lastPrice") },
+    current: { key: "current", label: "Current value (₹)", type: "number", required: true, showWhen: shows("current") },
+    rate: { key: "rate", label: "Interest rate (% p.a.)", type: "number", showWhen: shows("rate") },
+    compounding: { key: "compounding", label: "Compounding", type: "select", options: COMPOUNDING_OPTIONS as unknown as string[], default: "Yearly", showWhen: shows("compounding") },
+    date: { key: "date", label: "Start / purchase date", type: "date", default: today, showWhen: shows("date") },
+    maturityDate: { key: "maturityDate", label: "Maturity date", type: "date", showWhen: shows("maturityDate") },
+    maturityValue: { key: "maturityValue", label: "Maturity value (₹)", type: "number", showWhen: shows("maturityValue") },
+  };
+
+  const ASSET_FIELD_ORDER: InstrumentField[] = [
+    "institution",
+    "folio",
+    "purchase",
+    "units",
+    "avgCost",
+    "lastPrice",
+    "rate",
+    "compounding",
+    "date",
+    "maturityDate",
+    "maturityValue",
+    "current",
+  ];
+
   const assetFields: FieldDef[] = [
-    { key: "name", label: "Asset name", type: "text", required: true },
+    { key: "name", label: "Investment / asset name", type: "text", required: true },
     { key: "type", label: "Type", type: "select", options: ASSET_TYPES as unknown as string[], required: true },
-    { key: "purchase", label: "Purchase value (₹)", type: "number", required: true },
-    { key: "current", label: "Current value (₹)", type: "number", required: true },
-    { key: "date", label: "Purchase date", type: "date", default: today },
+    ...ASSET_FIELD_ORDER.map((k) => ASSET_FIELD_DEFS[k]),
   ];
 
   const liabilityFields: FieldDef[] = [
@@ -179,11 +213,32 @@ export function EntityDialogs({
   ];
 
   const investmentFields: FieldDef[] = [
-    { key: "asset", label: "Invest into (asset)", type: "select", options: assetNames, required: true },
-    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "asset", label: "Invest into (holding)", type: "select", options: assetNames, required: true },
+    { key: "employerFunded", label: "Employer funded", type: "switch", hint: "EPF / NPS employer share — no money leaves your accounts" },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true, showWhen: (v) => !v.employerFunded },
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "units", label: "Units bought (optional)", type: "number" },
+    { key: "pricePerUnit", label: "Price / NAV per unit (₹)", type: "number" },
     { key: "date", label: "Date", type: "date", default: today },
     { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
+  ];
+
+  const redemptionFields: FieldDef[] = [
+    { key: "asset", label: "Sell / withdraw from", type: "select", options: assetNames, required: true },
+    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    { key: "units", label: "Units sold (optional)", type: "number" },
+    { key: "amount", label: "Proceeds received (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
+  ];
+
+  const sipFields: FieldDef[] = [
+    { key: "asset", label: "Contribute to", type: "select", options: assetNames, required: true },
+    { key: "account", label: "Debit from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Instalment amount (₹)", type: "number", required: true },
+    { key: "frequency", label: "Frequency", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true },
+    { key: "nextDue", label: "Next due date", type: "date", default: today, required: true },
+    { key: "autoDebit", label: "Auto debit", type: "switch", hint: "The bank debits this automatically" },
   ];
 
   const dividendFields: FieldDef[] = [
@@ -272,7 +327,42 @@ export function EntityDialogs({
         onSubmit={(v) => f.addTransfer({ from: v.from, to: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
       />
       <FormDialog open={open === "investment"} onClose={onClose} title="Record investment" fields={investmentFields}
-        onSubmit={(v) => f.addInvestment({ asset: v.asset, account: v.account, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+        onSubmit={(v) =>
+          f.addInvestment({
+            asset: v.asset,
+            account: v.account,
+            amount: Number(v.amount),
+            date: v.date || today,
+            notes: v.notes,
+            units: v.units ? Number(v.units) : undefined,
+            pricePerUnit: v.pricePerUnit ? Number(v.pricePerUnit) : undefined,
+            employerFunded: !!v.employerFunded,
+          })
+        }
+      />
+      <FormDialog open={open === "redemption"} onClose={onClose} title="Redeem / sell investment" fields={redemptionFields}
+        onSubmit={(v) =>
+          f.addRedemption({
+            asset: v.asset,
+            account: v.account,
+            amount: Number(v.amount),
+            units: v.units ? Number(v.units) : undefined,
+            date: v.date || today,
+            notes: v.notes,
+          })
+        }
+      />
+      <FormDialog open={open === "sip"} onClose={onClose} title="Schedule a contribution" fields={sipFields}
+        onSubmit={(v) =>
+          f.addSip({
+            asset: v.asset,
+            account: v.account,
+            amount: Number(v.amount),
+            frequency: v.frequency || "Monthly",
+            nextDue: v.nextDue || today,
+            autoDebit: !!v.autoDebit,
+          })
+        }
       />
       <FormDialog open={open === "dividend"} onClose={onClose} title="Record dividend" fields={dividendFields}
         onSubmit={(v) => f.addDividend({ source: v.source, account: v.account, amount: Number(v.amount), date: v.date || today })}
