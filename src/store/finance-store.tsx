@@ -326,12 +326,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     loading,
     totals,
     summary,
-    transactions: ledger,
-    hasMoreTransactions: transactions.hasMore,
-    isLoadingMoreTransactions: transactions.isLoadingMore,
-    loadMoreTransactions: () => transactions.loadMore(),
     removeTransaction: (id) => transactions.remove.mutate(id),
-    accounts, incomes, expenses, assets, liabilities, goals, budgets, bills, notifications,
+    accounts, assets, liabilities, goals, budgets, bills, notifications,
 
     addAccount: (v) => wallets.create.mutate(walletCreatePayload(v)),
     updateAccount: (id, v) => wallets.update.mutate({ id, values: walletUpdatePayload(v) }),
