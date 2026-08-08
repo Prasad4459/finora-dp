@@ -637,11 +637,13 @@ export type Database = {
           notes: string | null
           payee: string | null
           payment_method: string | null
+          price_per_unit: number | null
           principal_amount: number | null
           status: Database["public"]["Enums"]["transaction_status"]
           to_wallet_id: string | null
           transaction_date: string
           type: Database["public"]["Enums"]["transaction_type"]
+          units: number | null
           updated_at: string
           user_id: string
           wallet_id: string | null
@@ -660,11 +662,13 @@ export type Database = {
           notes?: string | null
           payee?: string | null
           payment_method?: string | null
+          price_per_unit?: number | null
           principal_amount?: number | null
           status?: Database["public"]["Enums"]["transaction_status"]
           to_wallet_id?: string | null
           transaction_date?: string
           type: Database["public"]["Enums"]["transaction_type"]
+          units?: number | null
           updated_at?: string
           user_id: string
           wallet_id?: string | null
@@ -683,11 +687,13 @@ export type Database = {
           notes?: string | null
           payee?: string | null
           payment_method?: string | null
+          price_per_unit?: number | null
           principal_amount?: number | null
           status?: Database["public"]["Enums"]["transaction_status"]
           to_wallet_id?: string | null
           transaction_date?: string
           type?: Database["public"]["Enums"]["transaction_type"]
+          units?: number | null
           updated_at?: string
           user_id?: string
           wallet_id?: string | null
@@ -932,6 +938,7 @@ export type Database = {
         | "refund"
         | "dividend"
         | "emi"
+        | "redemption"
       wallet_type:
         | "bank_account"
         | "cash"
@@ -1129,6 +1136,7 @@ export const Constants = {
         "refund",
         "dividend",
         "emi",
+        "redemption",
       ],
       wallet_type: [
         "bank_account",
