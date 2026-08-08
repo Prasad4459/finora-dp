@@ -8,12 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
+import { useLedger } from "@/hooks/use-ledger";
 import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
 
 const TREND_MONTHS = 6;
 
 export function Income() {
-  const { incomes, openDialog, openEditDialog, removeIncome, totals, summary, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  const { openDialog, openEditDialog, removeIncome, totals, summary } = useFinance();
+  // Paginated ledger lives in its own hook so pages without a ledger never load it.
+  const { incomes, hasMore: hasMoreTransactions, isLoadingMore: isLoadingMoreTransactions, loadMore: loadMoreTransactions } = useLedger();
   // All totals below come from server-side aggregates, not the loaded page.
   const monthTotal = totals.monthIncome;
   const previous = summary.metricsFor(addMonths(summary.current, -1)).grossIncome;

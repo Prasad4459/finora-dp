@@ -8,13 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
+import { useLedger } from "@/hooks/use-ledger";
 import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
 
 const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--muted-foreground)"];
 const TREND_MONTHS = 6;
 
 export function Expenses() {
-  const { expenses, openDialog, openEditDialog, removeExpense, totals, summary, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  const { openDialog, openEditDialog, removeExpense, totals, summary } = useFinance();
+  // Paginated ledger lives in its own hook so pages without a ledger never load it.
+  const { expenses, hasMore: hasMoreTransactions, isLoadingMore: isLoadingMoreTransactions, loadMore: loadMoreTransactions } = useLedger();
   // Server-side aggregates only — the table below is paginated and can never
   // be used to compute a total.
   const monthTotal = totals.monthExpenses;
