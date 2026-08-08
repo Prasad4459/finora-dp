@@ -852,6 +852,7 @@ export type Database = {
           _amount: number
           _bill_id: string
           _next_due_date?: string
+          _occurrence_date: string
           _paid_date: string
           _wallet_id: string
         }
