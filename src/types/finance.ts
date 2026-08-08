@@ -67,6 +67,11 @@ export type Budget = {
   spent: number;
   budget: number;
   categoryId: string | null;
+  /** The budget's own period — never the current month. */
+  periodYear: number;
+  periodMonth: number;
+  /** e.g. "Jul 2026". */
+  periodLabel: string;
 };
 
 export type Bill = {
