@@ -59,12 +59,73 @@ export type Database = {
         }
         Relationships: []
       }
+      bill_payments: {
+        Row: {
+          bill_id: string
+          created_at: string
+          due_date: string
+          expected_amount: number
+          id: string
+          notes: string | null
+          paid_amount: number
+          paid_date: string
+          period_key: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bill_id: string
+          created_at?: string
+          due_date: string
+          expected_amount?: number
+          id?: string
+          notes?: string | null
+          paid_amount?: number
+          paid_date?: string
+          period_key: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bill_id?: string
+          created_at?: string
+          due_date?: string
+          expected_amount?: number
+          id?: string
+          notes?: string | null
+          paid_amount?: number
+          paid_date?: string
+          period_key?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_payments_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_payments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bills: {
         Row: {
           amount: number
           auto_pay: boolean
           category_id: string | null
           created_at: string
+          description: string | null
           due_date: string
           frequency: Database["public"]["Enums"]["bill_frequency"]
           icon: string | null
@@ -85,6 +146,7 @@ export type Database = {
           auto_pay?: boolean
           category_id?: string | null
           created_at?: string
+          description?: string | null
           due_date: string
           frequency?: Database["public"]["Enums"]["bill_frequency"]
           icon?: string | null
@@ -105,6 +167,7 @@ export type Database = {
           auto_pay?: boolean
           category_id?: string | null
           created_at?: string
+          description?: string | null
           due_date?: string
           frequency?: Database["public"]["Enums"]["bill_frequency"]
           icon?: string | null
@@ -336,6 +399,7 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string
+          dedupe_key: string | null
           id: string
           is_read: boolean
           link: string | null
@@ -347,6 +411,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           is_read?: boolean
           link?: string | null
@@ -358,6 +423,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           is_read?: boolean
           link?: string | null
