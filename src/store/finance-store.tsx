@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { EntityDialogs } from "@/components/forms/entity-dialogs";
-import { categoriesRepo } from "@/repositories";
+import { assetsRepo, categoriesRepo } from "@/repositories";
 import { financeKeys } from "@/hooks/query-keys";
 import { errorMessage } from "@/hooks/use-entity-mutation";
 import { useWallets } from "@/hooks/use-wallets";
@@ -660,7 +660,46 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         } as Omit<TransactionInsert, "user_id">);
       }),
 
-    addAsset: (v) => assetsData.create.mutate(assetPayload(v)),
+    // ADDING AN INVESTMENT IS A LEDGER EVENT.
+    // When a funding account is chosen, the holding is NOT written with a
+    // balance of its own: an investment transaction is created and the
+    // database trigger debits the wallet and grows the asset. That keeps the
+    // ledger the single source of truth for both sides of the purchase.
+    addAsset: (v) =>
+      run(async () => {
+        const meta = instrumentMeta(v.type);
+        const funded = Boolean(v.fundingWalletId) || Boolean(v.employerFunded);
+        if (!funded || !meta.investment) {
+          assetsData.create.mutate(assetPayload(v));
+          return;
+        }
+        const walletId = v.employerFunded
+          ? null
+          : requireWalletId(v.fundingWalletId, "Funding account");
+        const { units, avgCost, lastPrice } = unitValuation(v);
+        const categoryId = await resolveCategoryId("Investment", "expense");
+        const asset = await assetsRepo.create({
+          ...assetPayload(v),
+          purchase_value: 0,
+          current_value: 0,
+          units: units ? 0 : null,
+          avg_cost: null,
+          last_price: lastPrice,
+        });
+        createTx({
+          type: "investment",
+          amount: Number(v.purchase || 0),
+          transaction_date: v.date || todayISODate(),
+          wallet_id: walletId,
+          asset_id: asset.id,
+          payee: v.name,
+          units: units ?? null,
+          price_per_unit: avgCost,
+          category_id: categoryId,
+          notes: v.employerFunded ? "Employer contribution" : null,
+        } as Omit<TransactionInsert, "user_id">);
+        await qc.invalidateQueries({ queryKey: financeKeys.assets });
+      }),
     updateAsset: (id, v) => assetsData.update.mutate({ id, values: assetPayload(v) }),
     removeAsset: (id) => assetsData.remove.mutate(id),
 
