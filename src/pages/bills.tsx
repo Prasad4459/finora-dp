@@ -18,7 +18,6 @@ import { MarkPaidDialog, type MarkPaidValues } from "@/components/finance/mark-p
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { formatINR } from "@/lib/format";
 import { isoToDMY, toBill } from "@/lib/finance-mappers";
 import { todayISO } from "@/lib/date-in";
