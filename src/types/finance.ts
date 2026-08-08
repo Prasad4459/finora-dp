@@ -90,6 +90,8 @@ export type Bill = {
   frequency: string;
   isRecurring: boolean;
   walletId: string | null;
+  /** Resolved wallet name, filled by the page that has the wallet list. */
+  accountName?: string;
   categoryId: string | null;
   description: string;
   reminderEnabled: boolean;
