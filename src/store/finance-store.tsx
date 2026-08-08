@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { EntityDialogs } from "@/components/forms/entity-dialogs";
 import { categoriesRepo } from "@/repositories";
@@ -7,7 +7,7 @@ import { financeKeys } from "@/hooks/query-keys";
 import { errorMessage } from "@/hooks/use-entity-mutation";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
-import { useTransactions } from "@/hooks/use-transactions";
+import { useTransactionMutations } from "@/hooks/use-transactions";
 import { useAssets } from "@/hooks/use-assets";
 import { useLiabilities } from "@/hooks/use-liabilities";
 import { useGoals } from "@/hooks/use-goals";
@@ -17,7 +17,6 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
-import { toTransactionView, type TransactionView } from "@/lib/transaction-view";
 import {
   assetTypeFromLabel,
   dmyToISO,
@@ -80,19 +79,16 @@ export type EditTarget =
   | { kind: "bill"; entity: Bill };
 
 type Ctx = {
+  /** True while ANY finance query is in flight — drives the thin top bar only.
+   *  No widget may gate its own rendering on this. */
   loading: boolean;
   totals: FinanceTotals;
   /** Server-side aggregates: the only valid source of financial totals. */
   summary: FinanceSummary;
-  /** Unified ledger — every supported transaction type, newest first. */
-  transactions: TransactionView[];
-  hasMoreTransactions: boolean;
-  isLoadingMoreTransactions: boolean;
-  loadMoreTransactions: () => void;
   removeTransaction: (id: string) => void;
   accounts: Account[]; addAccount: (v: AccountInput) => void; updateAccount: (id: string, v: AccountInput) => void; removeAccount: (id: string) => void;
-  incomes: Income[]; addIncome: (v: IncomeInput) => void; updateIncome: (id: string, v: IncomeInput) => void; removeIncome: (id: string) => void;
-  expenses: Expense[]; addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
+  addIncome: (v: IncomeInput) => void; updateIncome: (id: string, v: IncomeInput) => void; removeIncome: (id: string) => void;
+  addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
   addTransfer: (v: TransferInput) => void;
   addInvestment: (v: InvestmentInput) => void;
   addDividend: (v: DividendInput) => void;
