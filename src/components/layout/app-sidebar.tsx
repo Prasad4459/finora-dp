@@ -11,6 +11,7 @@ import {
   Target,
   PieChart,
   Receipt,
+  LineChart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -34,6 +35,7 @@ const nav = [
   { title: "Income", url: "/income", icon: ArrowDownCircle },
   { title: "Expenses", url: "/expenses", icon: ArrowUpCircle },
   { title: "Assets", url: "/assets", icon: Landmark },
+  { title: "Investments", url: "/investments", icon: LineChart },
   { title: "Liabilities", url: "/liabilities", icon: CreditCard },
   { title: "Goals", url: "/goals", icon: Target },
   { title: "Budget", url: "/budget", icon: PieChart },
