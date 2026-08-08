@@ -48,31 +48,47 @@ export async function payBill(input: PayBillInput) {
   const dueISO = (bill.due_date ?? todayISO()).slice(0, 10);
   const periodKey = occurrenceKey(dueISO);
 
-  // Duplicate guard (also enforced by a UNIQUE(bill_id, period_key) index).
-  const existing = await billPaymentsRepo.listForBill(bill.id);
-  if (existing.some((p) => p.period_key === periodKey)) {
-    throw new Error("This bill occurrence is already marked as paid");
+  // CLAIM THE OCCURRENCE FIRST.
+  // The UNIQUE(bill_id, period_key) index is the only reliable duplicate guard
+  // (a read-then-write check races with double clicks and other tabs). The
+  // expense is created only once this insert has won, so a rejected duplicate
+  // can never leave a stray ledger row behind.
+  let claim;
+  try {
+    claim = await billPaymentsRepo.create({
+      bill_id: bill.id,
+      period_key: periodKey,
+      due_date: dueISO,
+      expected_amount: Number(bill.amount),
+      paid_amount: input.amount,
+      paid_date: input.paidDate,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (/duplicate key|23505/i.test(message)) {
+      throw new Error("This bill occurrence is already marked as paid");
+    }
+    throw e;
   }
 
-  const tx = await transactionsRepo.create({
-    type: "expense",
-    amount: input.amount,
-    transaction_date: input.paidDate,
-    wallet_id: input.walletId,
-    category_id: bill.category_id,
-    payee: bill.name,
-    notes: input.notes || `Bill payment — ${bill.name}`,
-  });
+  let tx;
+  try {
+    tx = await transactionsRepo.create({
+      type: "expense",
+      amount: input.amount,
+      transaction_date: input.paidDate,
+      wallet_id: input.walletId,
+      category_id: bill.category_id,
+      payee: bill.name,
+      notes: input.notes || `Bill payment — ${bill.name}`,
+    });
+  } catch (e) {
+    // Release the claim so the occurrence stays payable.
+    await billPaymentsRepo.remove(claim.id).catch(() => undefined);
+    throw e;
+  }
 
-  await billPaymentsRepo.create({
-    bill_id: bill.id,
-    transaction_id: tx.id,
-    period_key: periodKey,
-    due_date: dueISO,
-    expected_amount: Number(bill.amount),
-    paid_amount: input.amount,
-    paid_date: input.paidDate,
-  });
+  await billPaymentsRepo.update(claim.id, { transaction_id: tx.id });
 
   // Recurring bills roll forward to their next occurrence; the recurring
   // definition stays the single source of truth (no future rows created).
