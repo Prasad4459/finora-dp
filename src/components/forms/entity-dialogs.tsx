@@ -146,6 +146,26 @@ export function EntityDialogs({
     { key: "method", label: "Payment method", type: "select", options: PAYMENT_METHODS as unknown as string[] },
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
+    // AN EMI IS A LOAN REPAYMENT, NOT A PLAIN EXPENSE.
+    // Choosing the EMI category asks for the loan and the interest split so
+    // the same ledger row also reduces the outstanding balance.
+    {
+      key: "liability",
+      label: "Loan being repaid",
+      type: "select",
+      options: liabilityNames,
+      required: true,
+      placeholder: "Select loan",
+      requiredMessage: "Select the loan this EMI repays so its balance goes down.",
+      showWhen: (v) => v.category === "EMI",
+    },
+    {
+      key: "interest",
+      label: "Interest portion (₹)",
+      type: "number",
+      hint: "The rest of the instalment repays principal and reduces the loan.",
+      showWhen: (v) => v.category === "EMI",
+    },
   ];
 
   // INSTRUMENT-AWARE ASSET FORM
@@ -329,6 +349,19 @@ export function EntityDialogs({
       />
       <FormDialog open={open === "expense"} onClose={onClose} title={isEdit("expense") ? "Edit expense" : "Add expense"} fields={expenseFields} {...common("expense")}
         onSubmit={(v) => {
+          if (!isEdit("expense") && v.category === "EMI" && v.liability) {
+            const amount = Number(v.amount);
+            const interest = Number(v.interest || 0);
+            f.addEmiPayment({
+              liability: String(v.liability),
+              walletId: String(v.walletId),
+              amount,
+              principal: Math.max(0, amount - interest),
+              interest,
+              date: (v.date as string) || today,
+            });
+            return;
+          }
           const payload = { merchant: v.merchant, category: v.category, account: "", walletId: v.walletId, method: v.method || "UPI", amount: Number(v.amount), date: v.date || today };
           isEdit("expense") ? f.updateExpense(editId!, payload) : f.addExpense(payload);
         }}
