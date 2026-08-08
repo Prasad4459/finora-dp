@@ -12,6 +12,7 @@ import {
 } from "@/constants/finance";
 import { todayISO } from "@/lib/date-in";
 import { FREQUENCY_LABEL, FREQUENCY_OPTIONS, type Frequency } from "@/services/bills";
+import { COMPOUNDING_OPTIONS, instrumentMeta, type InstrumentField } from "@/services/instruments";
 import { useFinance, type EditTarget } from "@/store/finance-store";
 import type { EntityKind } from "@/types/finance";
 
@@ -36,7 +37,21 @@ function initialFor(editing: EditTarget | null): Values | null {
     case "expense":
       return { merchant: str("merchant"), category: str("category"), account: str("account"), method: str("method"), amount: str("amount"), date: str("date") };
     case "asset":
-      return { name: str("name"), type: str("type"), purchase: str("purchase"), current: str("current"), date: str("date") };
+      return {
+        name: str("name"),
+        type: str("type"),
+        purchase: str("purchase"),
+        current: str("current"),
+        date: str("date"),
+        institution: str("institution"),
+        folio: str("folio"),
+        units: str("units"),
+        lastPrice: str("lastPrice"),
+        rate: str("rate"),
+        compounding: str("compounding"),
+        maturityDate: str("maturityDate"),
+        maturityValue: str("maturityValue"),
+      };
     case "liability":
       return { name: str("name"), type: str("type"), balance: str("balance"), rate: str("rate"), emi: str("emi"), due: str("due") };
     case "goal":
