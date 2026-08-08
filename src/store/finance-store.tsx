@@ -346,13 +346,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       budgetsData.update.mutate({ id: existing.id, values: { name: v.name, amount: v.budget, category_id } });
       return;
     }
-    const now = new Date();
+    // New budgets are created for the current INDIAN calendar month.
+    const period = currentMonth();
     budgetsData.create.mutate({
       name: v.name,
       amount: v.budget,
       category_id,
-      period_month: now.getMonth() + 1,
-      period_year: now.getFullYear(),
+      period_month: period.month,
+      period_year: period.year,
     });
   };
 
