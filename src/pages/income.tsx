@@ -1,4 +1,4 @@
-import { Plus, ArrowDownCircle, TrendingUp, Calendar, Trash2, Pencil } from "lucide-react";
+import { Plus, ArrowDownCircle, TrendingUp, Calendar, Trash2, Pencil, RotateCcw } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
@@ -24,8 +24,10 @@ export function Income() {
   const ytd = ytdMetrics.grossIncome;
   const avg = Math.round(ytd / Math.max(1, summary.current.month));
   const today = todayISO();
+  // Refunds are inflows but NOT income: filter on the ledger type, never on a
+  // category name.
   const todayTotal = incomes
-    .filter((i) => i.date === today && i.category !== "Refund")
+    .filter((i) => i.date === today && i.txType !== "refund")
     .reduce((s, i) => s + i.amount, 0);
   const trend = summary.series(TREND_MONTHS).map(({ ref, metrics }) => ({
     month: monthShortLabel(ref),
@@ -37,9 +39,14 @@ export function Income() {
         title="Income"
         description="Track every rupee that comes in."
         actions={
-          <Button size="sm" onClick={() => openDialog("income")}>
-            <Plus className="mr-1 h-4 w-4" /> Add income
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => openDialog("refund")}>
+              <RotateCcw className="mr-1 h-4 w-4" /> Record refund
+            </Button>
+            <Button size="sm" onClick={() => openDialog("income")}>
+              <Plus className="mr-1 h-4 w-4" /> Add income
+            </Button>
+          </div>
         }
       />
 
@@ -95,6 +102,7 @@ export function Income() {
                   <TableCell className="text-muted-foreground">{formatDateIN(i.date)}</TableCell>
                   <TableCell className="font-medium">
                     {i.source}
+                    {i.txType === "refund" && <Badge variant="secondary" className="ml-2 text-[10px]">Refund</Badge>}
                     {i.recurring && <Badge variant="secondary" className="ml-2 text-[10px]">Recurring</Badge>}
                   </TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px]">{i.category}</Badge></TableCell>

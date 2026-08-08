@@ -37,7 +37,6 @@ export const INCOME_CATEGORIES = [
   "Interest",
   "Dividend",
   "Cashback",
-  "Refund",
   "Gift",
 ] as const;
 
