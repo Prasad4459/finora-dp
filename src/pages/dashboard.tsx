@@ -84,14 +84,6 @@ const expenseBreakdown = [
   { name: "Miscellaneous", value: 2500, color: "var(--muted-foreground)" },
 ];
 
-const recentTransactions = [
-  { id: 1, name: "BigBasket", category: "Groceries", account: "HDFC •• 4021", date: "02/07/2026", amount: -2450, icon: ShoppingBag },
-  { id: 2, name: "Salary — Infosys Ltd.", category: "Salary", account: "SBI •• 8891", date: "01/07/2026", amount: 85000, icon: ArrowDownCircle },
-  { id: 3, name: "Ola Cabs", category: "Travel", account: "ICICI •• 1009", date: "30/06/2026", amount: -320, icon: Car },
-  { id: 4, name: "Netflix", category: "Entertainment", account: "HDFC •• 4021", date: "29/06/2026", amount: -649, icon: Film },
-  { id: 5, name: "Swiggy", category: "Food & Dining", account: "Axis •• 3320", date: "29/06/2026", amount: -540, icon: Utensils },
-  { id: 6, name: "Apollo Pharmacy", category: "Healthcare", account: "HDFC •• 4021", date: "28/06/2026", amount: -820, icon: Heart },
-];
 
 const upcomingBills = [
   { id: 1, name: "Rent", due: "05/07/2026", amount: 18000, icon: Home },
