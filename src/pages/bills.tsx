@@ -233,12 +233,7 @@ export function Bills() {
                           size="icon"
                           variant="ghost"
                           className="h-8 w-8"
-                          onClick={() =>
-                            openEditDialog({
-                              kind: "bill",
-                              entity: { ...bill, accountName: walletName(row.wallet_id) },
-                            })
-                          }
+                          onClick={() => openEditDialog({ kind: "bill", entity: bill })}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>

@@ -42,6 +42,9 @@ export type PayBillInput = {
  */
 export async function payBill(input: PayBillInput) {
   const { bill } = input;
+  // A bill payment always moves real money out of a real account.
+  if (!input.walletId) throw new Error("Select an account for this transaction.");
+  if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Enter a valid amount");
   const dueISO = (bill.due_date ?? todayISO()).slice(0, 10);
   const periodKey = occurrenceKey(dueISO);
 

@@ -536,12 +536,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       run(async () => {
         const row = contributionsData.rows.find((c) => c.id === id);
         if (!row) throw new Error("Contribution schedule was not found");
+        // A scheduled contribution debits a real account; it can never post
+        // a wallet-less transaction.
+        const walletId = requireWalletId(row.wallet_id, "Debit account");
         const on = date || row.next_due_date?.slice(0, 10) || todayISODate();
         createTx({
           type: "investment",
           amount: Number(row.amount),
           transaction_date: on,
-          wallet_id: row.wallet_id,
+          wallet_id: walletId,
           asset_id: row.asset_id,
           payee: assetName(row.asset_id),
           category_id: await resolveCategoryId("Investment", "expense"),
