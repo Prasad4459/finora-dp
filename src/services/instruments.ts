@@ -73,7 +73,6 @@ const UNIT_FIELDS: InstrumentField[] = [
   "purchase",
   "units",
   "lastPrice",
-  "current",
   "date",
 ];
 const DEPOSIT_FIELDS: InstrumentField[] = [
@@ -224,6 +223,7 @@ export type HoldingInput = {
   current: number;
   date: string;
   units?: number | null;
+  avgCost?: number | null;
   lastPrice?: number | null;
   rate?: number | null;
   compounding?: string | null;
@@ -237,7 +237,16 @@ export type HoldingInput = {
  */
 export function derivedValue(h: HoldingInput, asOfISO: string): number {
   const meta = instrumentMeta(h.type);
-  if (meta.valuation === "market") return marketValue(h.units ?? null, h.lastPrice ?? null) ?? h.current;
+  if (meta.valuation === "market") {
+    // A market price is only meaningful PER UNIT. When none is recorded we fall
+    // back to average cost (value == invested, gain 0) — never to a stored
+    // figure multiplied by units, which would inflate the portfolio.
+    return (
+      marketValue(h.units ?? null, h.lastPrice ?? null) ??
+      marketValue(h.units ?? null, h.avgCost ?? null) ??
+      (h.current || h.purchase)
+    );
+  }
   if (meta.valuation === "accrual" && h.rate)
     return accruedValue({
       principal: h.purchase || h.current,
