@@ -477,6 +477,7 @@ export function EntityDialogs({
         onSubmit={(v) => f.addEmiPayment({ liability: v.liability, walletId: v.walletId, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
       />
       <FormDialog open={open === "contribution"} onClose={onClose} title="Add to goal" fields={contributionFields}
+        initialValues={editing?.kind === "contribution" ? initial : null}
         onSubmit={(v) => f.addGoalContribution({ goal: v.goal, fromWalletId: v.walletId, toWalletId: v.to, amount: Number(v.amount), date: v.date || today })}
       />
     </>
