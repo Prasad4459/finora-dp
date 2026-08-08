@@ -11,6 +11,7 @@ import {
   PAYMENT_METHODS,
 } from "@/constants/finance";
 import { todayISO } from "@/lib/date-in";
+import { FREQUENCY_LABEL, FREQUENCY_OPTIONS, type Frequency } from "@/services/bills";
 import { useFinance, type EditTarget } from "@/store/finance-store";
 import type { EntityKind } from "@/types/finance";
 
@@ -43,7 +44,18 @@ function initialFor(editing: EditTarget | null): Values | null {
     case "budget":
       return { name: str("name"), budget: str("budget"), spent: str("spent") };
     case "bill":
-      return { name: str("name"), category: str("category"), amount: str("amount"), due: str("due") };
+      return {
+        name: str("name"),
+        category: str("category"),
+        iconKey: str("iconKey"),
+        amount: str("amount"),
+        due: str("due"),
+        frequency: FREQUENCY_LABEL[(str("frequency") || "monthly") as Frequency] ?? "Monthly",
+        account: str("accountName"),
+        description: str("description"),
+        reminderEnabled: e.reminderEnabled !== false,
+        reminderDays: str("reminderDays") || "3",
+      };
   }
 }
 
@@ -134,8 +146,13 @@ export function EntityDialogs({
     { key: "name", label: "Bill name", type: "text", required: true },
     { key: "category", label: "Category", type: "select", options: BILL_CATEGORIES as unknown as string[], required: true },
     { key: "iconKey", label: "Icon", type: "select", options: BILL_ICON_KEYS as unknown as string[], default: "Receipt" },
-    { key: "amount", label: "Amount (₹)", type: "number", required: true },
-    { key: "due", label: "Due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true },
+    { key: "amount", label: "Expected amount (₹)", type: "number", required: true },
+    { key: "due", label: "Next due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true },
+    { key: "frequency", label: "Recurrence", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true },
+    { key: "account", label: "Pay from account", type: "select", options: accountNames },
+    { key: "reminderEnabled", label: "Reminders", type: "switch", default: "true" },
+    { key: "reminderDays", label: "Remind me (days before)", type: "number", default: "3" },
+    { key: "description", label: "Notes", type: "textarea", placeholder: "Optional" },
   ];
 
   const transferFields: FieldDef[] = [
