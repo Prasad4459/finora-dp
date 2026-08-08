@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Plus, TrendingUp, TrendingDown, Wallet, PiggyBank, CalendarClock, Pencil, ArrowDownLeft, ArrowUpRight, Trash2, Repeat } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
+import { RemoveInvestmentDialog } from "@/components/finance/remove-investment-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +21,7 @@ export function Investments() {
   const { openDialog, openEditDialog, removeSip, recordSipContribution } = useFinance();
   const { portfolio, schedules } = useInvestments();
   const positive = portfolio.gain >= 0;
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -127,9 +130,20 @@ export function Investments() {
                         <span className="ml-1 text-xs opacity-70">({pct(h.gainPct)})</span>
                       </TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "asset", entity: h })}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "asset", entity: h })}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            aria-label={`Remove ${h.name}`}
+                            onClick={() => setRemoving({ id: h.id, name: h.name })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -217,6 +231,8 @@ export function Investments() {
           </CardContent>
         </Card>
       )}
+
+      <RemoveInvestmentDialog holding={removing} onClose={() => setRemoving(null)} />
     </div>
   );
 }
