@@ -38,6 +38,29 @@ export type Asset = {
   purchase: number;
   current: number;
   date: string;
+  /* ---- investment facet (optional; physical assets leave these empty) ---- */
+  units?: number | null;
+  avgCost?: number | null;
+  lastPrice?: number | null;
+  rate?: number | null;
+  compounding?: string | null;
+  maturityDate?: string | null;
+  folio?: string | null;
+  institution?: string | null;
+};
+
+/** A scheduled recurring contribution (SIP / RD instalment / yearly deposit). */
+export type InvestmentContribution = {
+  id: string;
+  assetId: string;
+  assetName: string;
+  walletId: string | null;
+  amount: number;
+  frequency: string;
+  /** ISO "YYYY-MM-DD". */
+  nextDueISO: string;
+  autoDebit: boolean;
+  status: string;
 };
 
 export type Liability = {
@@ -113,4 +136,6 @@ export type EntityKind =
   | "dividend"
   | "refund"
   | "emi"
+  | "redemption"
+  | "sip"
   | "contribution";

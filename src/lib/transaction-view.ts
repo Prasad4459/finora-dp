@@ -41,10 +41,11 @@ export const TRANSACTION_TYPES: TransactionType[] = [
   "refund",
   "dividend",
   "emi",
+  "redemption",
 ];
 
 /** Cash inflow into a wallet. */
-export const INFLOW_TYPES: TransactionType[] = ["income", "refund", "dividend"];
+export const INFLOW_TYPES: TransactionType[] = ["income", "refund", "dividend", "redemption"];
 /** Cash outflow from a wallet. */
 export const OUTFLOW_TYPES: TransactionType[] = ["expense", "investment", "emi"];
 
@@ -56,6 +57,7 @@ export const TRANSACTION_LABEL: Record<TransactionType, string> = {
   refund: "Refund",
   dividend: "Dividend",
   emi: "EMI",
+  redemption: "Redemption",
 };
 
 export const directionOf = (type: TransactionType): TransactionDirection =>

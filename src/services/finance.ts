@@ -16,6 +16,7 @@
 //   transfers (incl. goal contributions) are never income or expense.
 import type { Account, Asset, Budget, Liability } from "@/types/finance";
 import { currentMonthKey, isInMonth, todayISO } from "@/lib/date-in";
+import { INSTRUMENTS } from "@/services/instruments";
 
 export { currentMonthKey, isInMonth, todayISO };
 
@@ -25,8 +26,15 @@ export const sum = <T,>(list: T[], pick: (item: T) => number) =>
 const safeDiv = (numerator: number, denominator: number) =>
   denominator > 0 && Number.isFinite(numerator / denominator) ? numerator / denominator : 0;
 
-/** Asset types treated as invested capital rather than physical holdings. */
-export const INVESTMENT_ASSET_TYPES = ["Stocks", "Mutual Funds", "PPF", "EPF", "NPS", "Crypto", "FD"];
+/**
+ * Asset types treated as invested capital rather than physical holdings.
+ * Derived from the instrument metadata so every new India instrument (ETF,
+ * bonds, RD, NSC, KVP, SCSS, SSY, post office…) is classified in one place.
+ * Gold/silver stay out: they are held value, not invested capital.
+ */
+export const INVESTMENT_ASSET_TYPES = Object.values(INSTRUMENTS)
+  .filter((i) => i.investment && i.assetClass !== "gold")
+  .map((i) => i.label);
 
 /**
  * Asset types that mirror money already tracked by a wallet. Counting them in

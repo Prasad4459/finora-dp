@@ -69,13 +69,23 @@ const ASSET_TYPE_BY_LABEL: Record<string, AssetType> = {
   Cash: "cash",
   Bank: "bank",
   FD: "fixed_deposit",
+  RD: "recurring_deposit",
   Gold: "gold",
   Silver: "silver",
   Stocks: "stocks",
   "Mutual Funds": "mutual_fund",
+  ETF: "etf",
+  Bonds: "bond",
+  REIT: "reit",
+  InvIT: "invit",
   PPF: "ppf",
   EPF: "epf",
   NPS: "nps",
+  "Sukanya Samriddhi": "sukanya_samriddhi",
+  NSC: "nsc",
+  KVP: "kvp",
+  SCSS: "scss",
+  "Post Office": "post_office",
   Property: "property",
   Vehicle: "vehicle",
   Crypto: "crypto",
@@ -85,13 +95,23 @@ const ASSET_LABEL_BY_TYPE: Record<AssetType, string> = {
   cash: "Cash",
   bank: "Bank",
   fixed_deposit: "FD",
+  recurring_deposit: "RD",
   gold: "Gold",
   silver: "Silver",
   stocks: "Stocks",
   mutual_fund: "Mutual Funds",
+  etf: "ETF",
+  bond: "Bonds",
+  reit: "REIT",
+  invit: "InvIT",
   ppf: "PPF",
   epf: "EPF",
   nps: "NPS",
+  sukanya_samriddhi: "Sukanya Samriddhi",
+  nsc: "NSC",
+  kvp: "KVP",
+  scss: "SCSS",
+  post_office: "Post Office",
   property: "Property",
   vehicle: "Vehicle",
   crypto: "Crypto",
@@ -162,14 +182,35 @@ export const toExpense = (t: Transaction, categoryName: string, walletName: stri
   amount: Number(t.amount),
 });
 
-export const toAsset = (a: AssetRow): Asset => ({
-  id: a.id,
-  name: a.name,
-  type: ASSET_LABEL_BY_TYPE[a.type] ?? "Other",
-  purchase: Number(a.purchase_value),
-  current: Number(a.current_value),
-  date: a.purchase_date ?? a.created_at.slice(0, 10),
-});
+export const toAsset = (a: AssetRow): Asset => {
+  // Generated types may lag behind the investment migration.
+  const x = a as AssetRow & {
+    units?: number | null;
+    avg_cost?: number | null;
+    last_price?: number | null;
+    interest_rate?: number | null;
+    compounding?: string | null;
+    maturity_date?: string | null;
+    folio_number?: string | null;
+  };
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return {
+    id: a.id,
+    name: a.name,
+    type: ASSET_LABEL_BY_TYPE[a.type] ?? "Other",
+    purchase: Number(a.purchase_value),
+    current: Number(a.current_value),
+    date: a.purchase_date ?? a.created_at.slice(0, 10),
+    units: num(x.units ?? a.quantity),
+    avgCost: num(x.avg_cost),
+    lastPrice: num(x.last_price),
+    rate: num(x.interest_rate),
+    compounding: x.compounding ?? null,
+    maturityDate: x.maturity_date ?? null,
+    folio: x.folio_number ?? null,
+    institution: a.institution ?? null,
+  };
+};
 
 export const toLiability = (l: LiabilityRow): Liability => ({
   id: l.id,

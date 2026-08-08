@@ -13,10 +13,11 @@ import { useLiabilities } from "@/hooks/use-liabilities";
 import { useGoals } from "@/hooks/use-goals";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useBills } from "@/hooks/use-bills";
+import { useInvestmentContributions } from "@/hooks/use-investment-contributions";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
-import { frequencyFromLabel } from "@/services/bills";
+import { frequencyFromLabel, nextDueDate } from "@/services/bills";
 import { useBillReminders } from "@/hooks/use-bill-reminders";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import {
@@ -43,6 +44,7 @@ import type {
   Expense,
   Goal,
   Income,
+  InvestmentContribution,
   Liability,
 } from "@/types/finance";
 
@@ -67,7 +69,33 @@ export type BillInput = {
 };
 
 export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
-export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
+export type InvestmentInput = {
+  asset: string;
+  account: string;
+  amount: number;
+  date: string;
+  notes?: string;
+  units?: number;
+  pricePerUnit?: number;
+};
+/** Selling / withdrawing an investment: cash returns to a wallet. */
+export type RedemptionInput = {
+  asset: string;
+  account: string;
+  amount: number;
+  date: string;
+  units?: number;
+  notes?: string;
+};
+/** A recurring contribution schedule (SIP, RD instalment, yearly deposit). */
+export type SipInput = {
+  asset: string;
+  account: string;
+  amount: number;
+  frequency: string;
+  nextDue: string;
+  autoDebit?: boolean;
+};
 export type DividendInput = { source: string; account: string; amount: number; date: string };
 export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
 export type ContributionInput = { goal: string; account: string; to: string; amount: number; date: string };
@@ -104,6 +132,13 @@ type Ctx = {
   addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
   addTransfer: (v: TransferInput) => void;
   addInvestment: (v: InvestmentInput) => void;
+  addRedemption: (v: RedemptionInput) => void;
+  /** Scheduled contributions (SIP / RD / yearly). */
+  contributions: InvestmentContribution[];
+  addSip: (v: SipInput) => void;
+  removeSip: (id: string) => void;
+  /** Records one instalment as a real investment transaction and rolls the schedule. */
+  recordSipContribution: (id: string, date?: string) => void;
   addDividend: (v: DividendInput) => void;
   addRefund: (v: RefundInput) => void;
   addEmiPayment: (v: EmiInput) => void;
@@ -142,6 +177,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const goalsData = useGoals();
   const budgetsData = useBudgets();
   const billsData = useBills();
+  const contributionsData = useInvestmentContributions();
   const notificationsData = useNotifications();
 
   // In-app bill reminders (deduplicated per bill occurrence).
@@ -170,6 +206,22 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const liabilities = useMemo(() => liabilitiesData.rows.map(toLiability), [liabilitiesData.rows]);
   const goals = useMemo(() => goalsData.rows.map(toGoal), [goalsData.rows]);
   const bills = useMemo(() => billsData.rows.map(toBill), [billsData.rows]);
+  const assetName = (id: string) => assetsData.rows.find((a) => a.id === id)?.name ?? "—";
+  const contributions = useMemo<InvestmentContribution[]>(
+    () =>
+      contributionsData.rows.map((c) => ({
+        id: c.id,
+        assetId: c.asset_id,
+        assetName: assetName(c.asset_id),
+        walletId: c.wallet_id,
+        amount: Number(c.amount),
+        frequency: c.frequency,
+        nextDueISO: (c.next_due_date ?? "").slice(0, 10),
+        autoDebit: c.auto_debit,
+        status: c.status,
+      })),
+    [contributionsData.rows, assetsData.rows],
+  );
   const notifications = useMemo(() => notificationsData.rows, [notificationsData.rows]);
 
   // Totals always describe the CURRENT IST month and come from the server-side
@@ -283,12 +335,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     wallet_id: resolveWalletId(v.account),
   });
 
+  const numOrNull = (v: unknown) => {
+    const n = Number(v);
+    return v === undefined || v === null || v === "" || !Number.isFinite(n) ? null : n;
+  };
+
   const assetPayload = (v: AssetInput) => ({
     name: v.name,
     type: assetTypeFromLabel(v.type),
     purchase_value: v.purchase,
     current_value: v.current,
     purchase_date: v.date || todayISODate(),
+    // Investment facet — only the fields the chosen instrument actually needs.
+    units: numOrNull(v.units),
+    last_price: numOrNull(v.lastPrice),
+    interest_rate: numOrNull(v.rate),
+    compounding: v.compounding || null,
+    maturity_date: v.maturityDate || null,
+    folio_number: v.folio || null,
+    institution: v.institution || null,
   });
 
   const liabilityPayload = (v: LiabilityInput) => ({
