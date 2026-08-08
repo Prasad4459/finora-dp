@@ -62,17 +62,18 @@ export type BillInput = {
   amount: number;
   iconKey: string;
   frequency?: string;
-  account?: string;
+  /** Wallet UUID (optional — a bill may have no default account). */
+  walletId?: string;
   description?: string;
   reminderEnabled?: boolean;
   reminderDays?: number | string;
 };
 
-export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
+export type TransferInput = { fromWalletId: string; toWalletId: string; amount: number; date: string; notes?: string };
 export type InvestmentInput = {
   asset: string;
-  /** Empty when the contribution is employer-funded (EPF / NPS). */
-  account?: string;
+  /** Wallet UUID. Empty when the contribution is employer-funded (EPF / NPS). */
+  walletId?: string;
   amount: number;
   date: string;
   notes?: string;
@@ -84,7 +85,7 @@ export type InvestmentInput = {
 /** Selling / withdrawing an investment: cash returns to a wallet. */
 export type RedemptionInput = {
   asset: string;
-  account: string;
+  walletId: string;
   amount: number;
   date: string;
   units?: number;
@@ -93,18 +94,18 @@ export type RedemptionInput = {
 /** A recurring contribution schedule (SIP, RD instalment, yearly deposit). */
 export type SipInput = {
   asset: string;
-  account: string;
+  walletId: string;
   amount: number;
   frequency: string;
   nextDue: string;
   autoDebit?: boolean;
 };
-export type DividendInput = { source: string; account: string; amount: number; date: string };
-export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
-export type ContributionInput = { goal: string; account: string; to: string; amount: number; date: string };
+export type DividendInput = { source: string; walletId: string; amount: number; date: string };
+export type RefundInput = { merchant: string; category: string; walletId: string; amount: number; date: string };
+export type ContributionInput = { goal: string; fromWalletId: string; toWalletId: string; amount: number; date: string };
 export type EmiInput = {
   liability: string;
-  account: string;
+  walletId: string;
   amount: number;
   principal: number;
   interest: number;
