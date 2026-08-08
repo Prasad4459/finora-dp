@@ -309,7 +309,13 @@ export function Bills() {
         onConfirm={(v: MarkPaidValues) => {
           if (!payTarget) return;
           bills.pay.mutate(
-            { bill: payTarget, amount: v.amount, walletId: v.walletId, paidDate: v.paidDate },
+            {
+              bill: payTarget,
+              occurrenceDate: occurrenceKey((payTarget.due_date ?? "").slice(0, 10)),
+              amount: v.amount,
+              walletId: v.walletId,
+              paidDate: v.paidDate,
+            },
             { onSuccess: () => setPayTarget(null) },
           );
         }}

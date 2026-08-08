@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,12 +32,14 @@ export function MarkPaidDialog({
   const [walletId, setWalletId] = useState("");
   const [paidDate, setPaidDate] = useState(todayISO());
   const [lastId, setLastId] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   if (bill && bill.id !== lastId) {
     setLastId(bill.id);
     setAmount(String(bill.amount));
     setWalletId(bill.wallet_id ?? wallets[0]?.id ?? "");
     setPaidDate(todayISO());
+    submittingRef.current = false;
   }
 
   const value = Number(amount);
@@ -88,7 +90,11 @@ export function MarkPaidDialog({
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
             disabled={!valid || pending}
-            onClick={() => valid && onConfirm({ amount: value, walletId, paidDate })}
+            onClick={() => {
+              if (!valid || submittingRef.current) return;
+              submittingRef.current = true;
+              onConfirm({ amount: value, walletId, paidDate });
+            }}
           >
             {pending ? "Saving…" : "Confirm payment"}
           </Button>

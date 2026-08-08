@@ -21,6 +21,8 @@ export const billPaymentsQueryOptions = queryOptions({
 
 export type PayBillInput = {
   bill: BillRow;
+  /** Immutable identity of the occurrence opened by the user. */
+  occurrenceDate: string;
   /** Amount actually paid — may differ from the bill's expected amount. */
   amount: number;
   walletId: string;
@@ -40,7 +42,8 @@ export async function payBill(input: PayBillInput) {
   // A bill payment always moves real money out of a real account.
   if (!input.walletId) throw new Error("Select an account for this transaction.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Enter a valid amount");
-  const dueISO = (bill.due_date ?? todayISO()).slice(0, 10);
+  const dueISO = input.occurrenceDate.slice(0, 10);
+  if (!dueISO) throw new Error("Bill occurrence date is required");
   const next = bill.is_recurring ? nextDueDate(dueISO, bill.frequency as Frequency) : null;
 
   // Claim + expense insert + wallet debit + bill roll-forward are one database
