@@ -1,19 +1,29 @@
-// Pure, React-free finance calculations. Everything here is testable in
-// isolation and must never import components, hooks or the Supabase client.
+// Pure, React-free finance calculations — the single place where Finora's
+// financial vocabulary is defined. Never imports components, hooks or Supabase.
+//
+// FINANCIAL DEFINITIONS (all figures for one IST calendar month)
+//   grossIncome           = income + dividends
+//   refunds               = money returned for an earlier outflow
+//   consumptionExpense    = expenses + EMI interest − refunds
+//                           (EMI principal repays debt and an investment buys
+//                            an asset: neither is consumption)
+//   cashOutflow           = expenses + investments + full EMI − refunds
+//   investmentContribution= cash moved from wallets into investment assets
+//   savings / cashRetained= grossIncome − cashOutflow
+//                           (identical to income + dividends + refunds −
+//                            gross outflow: a refund is counted exactly once)
+//   savingsRate           = savings ÷ grossIncome × 100, may be negative
+//   transfers (incl. goal contributions) are never income or expense.
 import type { Account, Asset, Budget, Liability } from "@/types/finance";
-import type { TransactionView } from "@/lib/transaction-view";
+import { currentMonthKey, isInMonth, todayISO } from "@/lib/date-in";
 
-export const todayISO = () => new Date().toISOString().slice(0, 10);
-
-/** "YYYY-MM" for the current month in the user's locale time. */
-export const currentMonthKey = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-
-export const isInMonth = (isoDate: string, monthKey = currentMonthKey()) =>
-  (isoDate ?? "").startsWith(monthKey);
+export { currentMonthKey, isInMonth, todayISO };
 
 export const sum = <T,>(list: T[], pick: (item: T) => number) =>
   list.reduce((total, item) => total + pick(item), 0);
+
+const safeDiv = (numerator: number, denominator: number) =>
+  denominator > 0 && Number.isFinite(numerator / denominator) ? numerator / denominator : 0;
 
 /** Asset types treated as invested capital rather than physical holdings. */
 export const INVESTMENT_ASSET_TYPES = ["Stocks", "Mutual Funds", "PPF", "EPF", "NPS", "Crypto", "FD"];
@@ -24,33 +34,112 @@ export const INVESTMENT_ASSET_TYPES = ["Stocks", "Mutual Funds", "PPF", "EPF", "
  */
 export const WALLET_MIRRORED_ASSET_TYPES = ["Cash", "Bank"];
 
-export type Cashflow = {
+/**
+ * NET-WORTH AUTHORITY RULE (prevents double counting)
+ * ---------------------------------------------------
+ * One financial value has exactly one authoritative home:
+ *  • Invested capital  -> the `assets` table. Wallets of type
+ *    "Investment Account" mirror the same holdings, so they are excluded from
+ *    net worth (they may still be used as a transaction source/destination).
+ *  • Debt              -> the `liabilities` table. "Loan Account" wallets
+ *    mirror a liability, so they are excluded too.
+ *  • Liquid cash       -> wallets (bank / cash / UPI / credit card). Asset
+ *    rows of type Cash or Bank mirror wallets and are excluded from assets.
+ */
+export const NON_NET_WORTH_ACCOUNT_TYPES = ["Investment Account", "Loan Account"];
+
+export const isNetWorthAccount = (a: Account) => !NON_NET_WORTH_ACCOUNT_TYPES.includes(a.type);
+
+/** Raw per-month totals as aggregated by Postgres (never by the browser). */
+export type MonthAggregate = {
+  key: string;
   income: number;
-  expenses: number;
-  invested: number;
-  transfersIn: number;
-  transfersOut: number;
-  net: number;
+  dividend: number;
+  refund: number;
+  expense: number;
+  investment: number;
+  emi: number;
+  emiInterest: number;
+  emiPrincipal: number;
+  transfer: number;
 };
 
-/**
- * Month cash-flow derived from the unified transaction list.
- * - income  = income + dividend (refunds are netted off expenses instead)
- * - expense = expenses + EMI interest − refunds  (EMI principal is debt
- *   repayment, and an investment converts cash into an asset — neither is
- *   consumption)
- * - transfers never count as income or expense.
- */
-export function computeCashflow(transactions: TransactionView[], monthKey = currentMonthKey()): Cashflow {
-  const inMonth = transactions.filter((t) => isInMonth(t.date, monthKey));
-  const of = (type: string) => inMonth.filter((t) => t.type === type);
-  const income = sum(of("income"), (t) => t.amount) + sum(of("dividend"), (t) => t.amount);
-  const refunds = sum(of("refund"), (t) => t.amount);
-  const emiInterest = sum(of("emi"), (t) => t.interest);
-  const expenses = Math.max(0, sum(of("expense"), (t) => t.amount) + emiInterest - refunds);
-  const invested = sum(of("investment"), (t) => t.amount);
-  const transfersOut = sum(of("transfer"), (t) => t.amount);
-  return { income, expenses, invested, transfersIn: transfersOut, transfersOut, net: income - expenses };
+export const emptyMonthAggregate = (key = currentMonthKey()): MonthAggregate => ({
+  key,
+  income: 0,
+  dividend: 0,
+  refund: 0,
+  expense: 0,
+  investment: 0,
+  emi: 0,
+  emiInterest: 0,
+  emiPrincipal: 0,
+  transfer: 0,
+});
+
+export type MonthMetrics = {
+  key: string;
+  grossIncome: number;
+  refunds: number;
+  consumptionExpense: number;
+  cashOutflow: number;
+  investmentContribution: number;
+  savings: number;
+  savingsRate: number;
+  emiPaid: number;
+  emiInterest: number;
+  emiPrincipal: number;
+  transfers: number;
+};
+
+/** Turns one month of raw totals into Finora's documented financial metrics. */
+export function monthMetrics(a: MonthAggregate): MonthMetrics {
+  const grossIncome = a.income + a.dividend;
+  const refunds = a.refund;
+  // Not clamped at zero: a month where refunds exceed spending is genuinely
+  // net-negative consumption and the refund must not silently disappear.
+  const consumptionExpense = a.expense + a.emiInterest - refunds;
+  const cashOutflow = a.expense + a.investment + a.emi - refunds;
+  const savings = grossIncome - cashOutflow;
+  const savingsRate =
+    grossIncome > 0
+      ? Math.round(safeDiv(savings, grossIncome) * 100)
+      : savings < 0
+        ? -100 // no income at all but money went out: worst possible rate
+        : 0;
+  return {
+    key: a.key,
+    grossIncome,
+    refunds,
+    consumptionExpense,
+    cashOutflow,
+    investmentContribution: a.investment,
+    savings,
+    savingsRate,
+    emiPaid: a.emi,
+    emiInterest: a.emiInterest,
+    emiPrincipal: a.emiPrincipal,
+    transfers: a.transfer,
+  };
+}
+
+/** Adds several months together (used for YTD and multi-month averages). */
+export function addAggregates(list: MonthAggregate[], key = "range"): MonthAggregate {
+  return list.reduce<MonthAggregate>(
+    (acc, m) => ({
+      key,
+      income: acc.income + m.income,
+      dividend: acc.dividend + m.dividend,
+      refund: acc.refund + m.refund,
+      expense: acc.expense + m.expense,
+      investment: acc.investment + m.investment,
+      emi: acc.emi + m.emi,
+      emiInterest: acc.emiInterest + m.emiInterest,
+      emiPrincipal: acc.emiPrincipal + m.emiPrincipal,
+      transfer: acc.transfer + m.transfer,
+    }),
+    emptyMonthAggregate(key),
+  );
 }
 
 export type FinanceTotals = {
@@ -64,17 +153,21 @@ export type FinanceTotals = {
   savingsRate: number;
   monthlyEmi: number;
   monthInvested: number;
+  monthSavings: number;
+  monthCashOutflow: number;
+  monthRefunds: number;
 };
 
 export function computeTotals(input: {
   accounts: Account[];
   assets: Asset[];
   liabilities: Liability[];
-  transactions: TransactionView[];
-  monthKey?: string;
+  /** Server-aggregated metrics for the month being shown. */
+  month: MonthMetrics;
 }): FinanceTotals {
-  const monthKey = input.monthKey ?? currentMonthKey();
-  const totalBalance = sum(input.accounts, (a) => a.balance);
+  // Only wallets that are the authoritative home of their value (see
+  // NET-WORTH AUTHORITY RULE above) contribute to the liquid balance.
+  const totalBalance = sum(input.accounts.filter(isNetWorthAccount), (a) => a.balance);
   // Wallet-mirrored assets (plain cash / bank holdings) are excluded so the
   // same money is not counted twice in net worth.
   const netWorthAssets = input.assets.filter((a) => !WALLET_MIRRORED_ASSET_TYPES.includes(a.type));
@@ -84,10 +177,7 @@ export function computeTotals(input: {
     (a) => a.current,
   );
   const totalDebt = sum(input.liabilities, (l) => l.balance);
-  const flow = computeCashflow(input.transactions, monthKey);
-  const monthIncome = flow.income;
-  const monthExpenses = flow.expenses;
-  const savingsRate = monthIncome > 0 ? Math.round(((monthIncome - monthExpenses) / monthIncome) * 100) : 0;
+  const month = input.month;
 
   return {
     totalBalance,
@@ -96,11 +186,14 @@ export function computeTotals(input: {
     totalDebt,
     // Net worth = (liquid balances + non-mirrored assets) − liabilities.
     netWorth: totalBalance + totalAssets - totalDebt,
-    monthIncome,
-    monthExpenses,
-    savingsRate,
+    monthIncome: month.grossIncome,
+    monthExpenses: month.consumptionExpense,
+    savingsRate: month.savingsRate,
     monthlyEmi: sum(input.liabilities, (l) => l.emi),
-    monthInvested: flow.invested,
+    monthInvested: month.investmentContribution,
+    monthSavings: month.savings,
+    monthCashOutflow: month.cashOutflow,
+    monthRefunds: month.refunds,
   };
 }
 
@@ -110,16 +203,20 @@ export function computeTotals(input: {
  */
 export function computeHealthScore(t: FinanceTotals): { score: number; label: string; runwayMonths: number } {
   const savingsPoints = Math.max(0, Math.min(40, Math.round((t.savingsRate / 50) * 40)));
-  const debtRatio = t.totalAssets + t.totalBalance > 0 ? t.totalDebt / (t.totalAssets + t.totalBalance) : 1;
+  const base = t.totalAssets + t.totalBalance;
+  const debtRatio = base > 0 ? safeDiv(t.totalDebt, base) : t.totalDebt > 0 ? 1 : 0;
   const debtPoints = Math.max(0, Math.min(30, Math.round((1 - debtRatio) * 30)));
-  const runwayMonths = t.monthExpenses > 0 ? t.totalBalance / t.monthExpenses : 0;
+  const runwayMonths = t.monthExpenses > 0 ? safeDiv(t.totalBalance, t.monthExpenses) : 0;
   const runwayPoints = Math.max(0, Math.min(30, Math.round((runwayMonths / 6) * 30)));
   const score = Math.max(0, Math.min(100, savingsPoints + debtPoints + runwayPoints));
   const label = score >= 75 ? "Strong" : score >= 50 ? "Good" : score >= 30 ? "Fair" : "Needs work";
   return { score, label, runwayMonths: Number(runwayMonths.toFixed(1)) };
 }
 
+/** Guarded against a zero / missing budget so it can never produce NaN. */
 export const budgetProgress = (b: Budget) => ({
-  pct: b.budget > 0 ? Math.min(Math.round((b.spent / b.budget) * 100), 130) : 0,
-  over: b.spent > b.budget,
+  pct: b.budget > 0 ? Math.max(0, Math.min(Math.round(safeDiv(b.spent, b.budget) * 100), 130)) : 0,
+  over: b.budget > 0 ? b.spent > b.budget : b.spent > 0,
 });
+
+export const percentOf = (part: number, whole: number) => Math.round(safeDiv(part, whole) * 100);
