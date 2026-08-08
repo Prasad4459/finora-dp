@@ -10,13 +10,14 @@ import {
   LIABILITY_TYPES,
   PAYMENT_METHODS,
 } from "@/constants/finance";
-import { todayISO } from "@/services/finance";
+import { todayISO } from "@/lib/date-in";
 import { useFinance, type EditTarget } from "@/store/finance-store";
 import type { EntityKind } from "@/types/finance";
 
+/** Today in DD/MM/YYYY, Indian calendar. */
 const todayDMY = () => {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  const [y, m, d] = todayISO().split("-");
+  return `${d}/${m}/${y}`;
 };
 
 type Values = Record<string, string | boolean>;
@@ -69,11 +70,15 @@ export function EntityDialogs({
     submitLabel: isEdit(kind) ? "Save changes" : "Save",
   });
 
+  // The balance is ledger-authoritative: it can only be set once, as the
+  // opening balance. Editing an account never overwrites the derived balance.
   const accountFields: FieldDef[] = [
     { key: "name", label: "Account name", type: "text", required: true },
     { key: "bank", label: "Bank / Provider", type: "text", required: true },
     { key: "type", label: "Account type", type: "select", options: ACCOUNT_TYPES as unknown as string[], required: true },
-    { key: "balance", label: "Current balance (₹)", type: "number", required: true },
+    ...(isEdit("account")
+      ? []
+      : ([{ key: "balance", label: "Opening balance (₹)", type: "number", required: true }] as FieldDef[])),
   ];
 
   const incomeFields: FieldDef[] = [
@@ -176,6 +181,7 @@ export function EntityDialogs({
   const contributionFields: FieldDef[] = [
     { key: "goal", label: "Goal", type: "select", options: goalNames, required: true },
     { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "to", label: "Held in account", type: "select", options: accountNames, required: true },
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
   ];
@@ -246,7 +252,7 @@ export function EntityDialogs({
         onSubmit={(v) => f.addEmiPayment({ liability: v.liability, account: v.account, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
       />
       <FormDialog open={open === "contribution"} onClose={onClose} title="Add to goal" fields={contributionFields}
-        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, account: v.account, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, account: v.account, to: v.to, amount: Number(v.amount), date: v.date || today })}
       />
     </>
   );
