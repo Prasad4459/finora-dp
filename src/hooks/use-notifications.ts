@@ -1,11 +1,12 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { notificationsRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 
 export const notificationsQueryOptions = queryOptions({
   queryKey: financeKeys.notifications,
   queryFn: () => notificationsRepo.listRecent(),
+  ...CACHE.short,
 });
 
 export function useNotifications() {
@@ -22,5 +23,11 @@ export function useNotifications() {
     success: "Notification removed",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, markRead, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), markRead, remove };
 }
