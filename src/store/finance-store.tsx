@@ -716,6 +716,40 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     updateAsset: (id, v) => assetsData.update.mutate({ id, values: assetPayload(v) }),
     removeAsset: (id) => assetsData.remove.mutate(id),
 
+    // SAFE INVESTMENT REMOVAL
+    // History is never destroyed silently: linked ledger rows are only removed
+    // when the caller explicitly opts in, and they are removed through the
+    // ledger so the database trigger reverses every wallet / asset effect.
+    removeInvestment: async (assetId, opts) => {
+      try {
+        const linked = await transactionsRepo.listByAsset(assetId);
+        if (linked.length > 0 && !opts?.reverseTransactions) {
+          throw new Error(
+            `This holding has ${linked.length} linked transaction${linked.length === 1 ? "" : "s"}. Redeem it, or confirm reversing them.`,
+          );
+        }
+        for (const t of linked) await transactionsRepo.remove(t.id);
+        const schedules = contributionsData.rows.filter((c) => c.asset_id === assetId);
+        for (const s of schedules) await investmentContributionsRepo.remove(s.id);
+        await assetsRepo.remove(assetId);
+        await Promise.all(
+          [
+            ...keysForTransaction(null),
+            financeKeys.assets,
+            financeKeys.investmentContributions,
+          ].map((queryKey) => qc.invalidateQueries({ queryKey })),
+        );
+        toast.success(
+          linked.length > 0
+            ? `Holding removed and ${linked.length} transaction${linked.length === 1 ? "" : "s"} reversed`
+            : "Holding removed",
+        );
+      } catch (e) {
+        toast.error(errorMessage(e));
+        throw e;
+      }
+    },
+
     addLiability: (v) => liabilitiesData.create.mutate(liabilityPayload(v)),
     updateLiability: (id, v) => liabilitiesData.update.mutate({ id, values: liabilityPayload(v) }),
     removeLiability: (id) => liabilitiesData.remove.mutate(id),
