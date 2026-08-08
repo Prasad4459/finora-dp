@@ -13,10 +13,11 @@ import { useLiabilities } from "@/hooks/use-liabilities";
 import { useGoals } from "@/hooks/use-goals";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useBills } from "@/hooks/use-bills";
+import { useInvestmentContributions } from "@/hooks/use-investment-contributions";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
-import { frequencyFromLabel } from "@/services/bills";
+import { frequencyFromLabel, nextDueDate } from "@/services/bills";
 import { useBillReminders } from "@/hooks/use-bill-reminders";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import {
@@ -43,6 +44,7 @@ import type {
   Expense,
   Goal,
   Income,
+  InvestmentContribution,
   Liability,
 } from "@/types/finance";
 
@@ -67,7 +69,33 @@ export type BillInput = {
 };
 
 export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
-export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
+export type InvestmentInput = {
+  asset: string;
+  account: string;
+  amount: number;
+  date: string;
+  notes?: string;
+  units?: number;
+  pricePerUnit?: number;
+};
+/** Selling / withdrawing an investment: cash returns to a wallet. */
+export type RedemptionInput = {
+  asset: string;
+  account: string;
+  amount: number;
+  date: string;
+  units?: number;
+  notes?: string;
+};
+/** A recurring contribution schedule (SIP, RD instalment, yearly deposit). */
+export type SipInput = {
+  asset: string;
+  account: string;
+  amount: number;
+  frequency: string;
+  nextDue: string;
+  autoDebit?: boolean;
+};
 export type DividendInput = { source: string; account: string; amount: number; date: string };
 export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
 export type ContributionInput = { goal: string; account: string; to: string; amount: number; date: string };
@@ -104,6 +132,13 @@ type Ctx = {
   addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
   addTransfer: (v: TransferInput) => void;
   addInvestment: (v: InvestmentInput) => void;
+  addRedemption: (v: RedemptionInput) => void;
+  /** Scheduled contributions (SIP / RD / yearly). */
+  contributions: InvestmentContribution[];
+  addSip: (v: SipInput) => void;
+  removeSip: (id: string) => void;
+  /** Records one instalment as a real investment transaction and rolls the schedule. */
+  recordSipContribution: (id: string, date?: string) => void;
   addDividend: (v: DividendInput) => void;
   addRefund: (v: RefundInput) => void;
   addEmiPayment: (v: EmiInput) => void;
