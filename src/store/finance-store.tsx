@@ -206,6 +206,22 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const liabilities = useMemo(() => liabilitiesData.rows.map(toLiability), [liabilitiesData.rows]);
   const goals = useMemo(() => goalsData.rows.map(toGoal), [goalsData.rows]);
   const bills = useMemo(() => billsData.rows.map(toBill), [billsData.rows]);
+  const assetName = (id: string) => assetsData.rows.find((a) => a.id === id)?.name ?? "—";
+  const contributions = useMemo<InvestmentContribution[]>(
+    () =>
+      contributionsData.rows.map((c) => ({
+        id: c.id,
+        assetId: c.asset_id,
+        assetName: assetName(c.asset_id),
+        walletId: c.wallet_id,
+        amount: Number(c.amount),
+        frequency: c.frequency,
+        nextDueISO: (c.next_due_date ?? "").slice(0, 10),
+        autoDebit: c.auto_debit,
+        status: c.status,
+      })),
+    [contributionsData.rows, assetsData.rows],
+  );
   const notifications = useMemo(() => notificationsData.rows, [notificationsData.rows]);
 
   // Totals always describe the CURRENT IST month and come from the server-side
