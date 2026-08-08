@@ -450,8 +450,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     // Transfer: one row, both legs. Never counted as income or expense.
     addTransfer: (v) =>
       run(async () => {
-        const from = requireWalletId(v.from, "Source");
-        const to = requireWalletId(v.to, "Destination");
+        const from = requireWalletId(v.fromWalletId, "Source account");
+        const to = requireWalletId(v.toWalletId, "Destination account");
         if (from === to) throw new Error("Source and destination must be different accounts");
         createTx({
           type: "transfer",
@@ -459,7 +459,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           transaction_date: v.date || todayISODate(),
           wallet_id: from,
           to_wallet_id: to,
-          payee: v.to,
+          payee: walletName(to),
           notes: v.notes || null,
         });
       }),
@@ -472,7 +472,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         // EMPLOYER-FUNDED CONTRIBUTIONS (EPF / NPS)
         // The asset grows but the user's bank balance never moved, so the
         // transaction carries no wallet: the trigger then skips the debit.
-        const walletId = v.employerFunded ? null : requireWalletId(v.account ?? "", "Source");
+        const walletId = v.employerFunded ? null : requireWalletId(v.walletId, "Source account");
         createTx({
           type: "investment",
           amount: v.amount,
@@ -501,7 +501,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "redemption",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Destination"),
+          wallet_id: requireWalletId(v.walletId, "Destination account"),
           asset_id: asset.id,
           payee: v.asset,
           units: v.units ?? null,
@@ -519,7 +519,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
         contributionsData.create.mutate({
           asset_id: asset.id,
-          wallet_id: resolveWalletId(v.account),
+          wallet_id: requireWalletId(v.walletId, "Debit account"),
           amount: v.amount,
           frequency: frequencyFromLabel(v.frequency || "Monthly"),
           next_due_date: v.nextDue || todayISODate(),
@@ -560,7 +560,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "dividend",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Destination"),
+          wallet_id: requireWalletId(v.walletId, "Destination account"),
           payee: v.source,
           category_id: await resolveCategoryId("Dividend", "income"),
         }),
@@ -572,7 +572,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "refund",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Destination"),
+          wallet_id: requireWalletId(v.walletId, "Destination account"),
           payee: v.merchant,
           category_id: await resolveCategoryId(v.category || "Refund", "expense"),
         }),
@@ -592,7 +592,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           type: "emi",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Source"),
+          wallet_id: requireWalletId(v.walletId, "Source account"),
           liability_id: liability.id,
           principal_amount: principal,
           interest_amount: interest,
@@ -612,8 +612,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       run(async () => {
         const goal = goalsData.rows.find((g) => g.name.toLowerCase() === v.goal.toLowerCase());
         if (!goal) throw new Error(`Goal "${v.goal}" was not found`);
-        const from = requireWalletId(v.account, "Source");
-        const to = requireWalletId(v.to, "Destination");
+        const from = requireWalletId(v.fromWalletId, "Source account");
+        const to = requireWalletId(v.toWalletId, "Destination account");
         if (from === to) throw new Error("Choose a different account to hold the goal money");
         createTx({
           type: "transfer",
