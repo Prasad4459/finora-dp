@@ -50,60 +50,21 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatINR, formatINRExact, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
-import { computeHealthScore } from "@/services/finance";
+import { computeHealthScore, netWorthChange, percentOf } from "@/services/finance";
+import { monthShortLabel } from "@/lib/date-in";
 import { TRANSACTION_LABEL } from "@/lib/transaction-view";
 import { formatDateIN } from "@/lib/format";
 
 
-const cashFlowData = [
-  { month: "Jan", income: 82000, expense: 41000 },
-  { month: "Feb", income: 85000, expense: 44000 },
-  { month: "Mar", income: 85000, expense: 47000 },
-  { month: "Apr", income: 90000, expense: 42000 },
-  { month: "May", income: 88000, expense: 51000 },
-  { month: "Jun", income: 92000, expense: 48000 },
-  { month: "Jul", income: 85000, expense: 42500 },
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--muted-foreground)",
 ];
-
-const netWorthData = [
-  { month: "Jan", value: 1250000 },
-  { month: "Feb", value: 1340000 },
-  { month: "Mar", value: 1450000 },
-  { month: "Apr", value: 1580000 },
-  { month: "May", value: 1690000 },
-  { month: "Jun", value: 1780000 },
-  { month: "Jul", value: 1875000 },
-];
-
-const expenseBreakdown = [
-  { name: "Rent", value: 18000, color: "var(--chart-1)" },
-  { name: "Groceries", value: 8500, color: "var(--chart-2)" },
-  { name: "Fuel", value: 4200, color: "var(--chart-3)" },
-  { name: "EMI", value: 6500, color: "var(--chart-4)" },
-  { name: "Entertainment", value: 2800, color: "var(--chart-5)" },
-  { name: "Miscellaneous", value: 2500, color: "var(--muted-foreground)" },
-];
-
-
-const upcomingBills = [
-  { id: 1, name: "Rent", due: "05/07/2026", amount: 18000, icon: Home },
-  { id: 2, name: "Electricity", due: "08/07/2026", amount: 2450, icon: Zap },
-  { id: 3, name: "Jio Fiber", due: "12/07/2026", amount: 999, icon: Wifi },
-  { id: 4, name: "HDFC Credit Card", due: "15/07/2026", amount: 12500, icon: CreditCard },
-];
-
-const recentIncome = [
-  { id: 1, name: "Salary — Infosys Ltd.", date: "01/07/2026", amount: 85000 },
-  { id: 2, name: "Freelance — Acme Co.", date: "28/06/2026", amount: 22000 },
-  { id: 3, name: "TCS Dividend", date: "15/06/2026", amount: 3600 },
-  { id: 4, name: "SBI Interest", date: "20/06/2026", amount: 1240 },
-];
-
-const goals = [
-  { id: 1, name: "Emergency Fund", target: 500000, saved: 325000, eta: "Mar 2027" },
-  { id: 2, name: "Goa Vacation", target: 80000, saved: 46000, eta: "Dec 2026" },
-  { id: 3, name: "New MacBook", target: 220000, saved: 90000, eta: "Feb 2027" },
-];
+const TREND_MONTHS = 7;
 
 const currency = formatINR;
 const currencyExact = formatINRExact;
@@ -148,7 +109,7 @@ function WelcomeHeader({ onAdd }: { onAdd: () => void }) {
 function DashboardInner() {
   const {
     openDialog, accounts, incomes, expenses, liabilities, bills: allBills, goals: allGoals,
-    totals, transactions: ledger,
+    totals, transactions: ledger, summary,
   } = useFinance();
   // All financial maths lives in the pure services layer (via the store).
   const { totalBalance, totalInvestments, totalDebt, netWorth, monthIncome, monthExpenses, savingsRate } = totals;
@@ -156,6 +117,38 @@ function DashboardInner() {
   const health = computeHealthScore(totals);
   const healthScore = health.score;
   const recent = ledger.slice(0, 6);
+
+  // ---- Server-aggregated series (never derived from the paginated list) ----
+  const series = summary.series(TREND_MONTHS);
+  const cashFlowData = series.map(({ ref, metrics }) => ({
+    month: monthShortLabel(ref),
+    income: metrics.grossIncome,
+    expense: metrics.consumptionExpense,
+  }));
+
+  // Net worth is only known for today, so the curve is reconstructed backwards
+  // by removing each month's net-worth change.
+  const netWorthData = (() => {
+    const points: Array<{ month: string; value: number }> = [];
+    let running = netWorth;
+    for (let i = series.length - 1; i >= 0; i--) {
+      points.unshift({ month: monthShortLabel(series[i].ref), value: Math.round(running) });
+      running -= netWorthChange(series[i].metrics);
+    }
+    return points;
+  })();
+  const ytd = summary.ytd();
+  const ytdGrowth = percentOf(netWorthChange(ytd), Math.max(1, netWorth - netWorthChange(ytd)));
+
+  const expenseBreakdown = summary.categorySpend(summary.current).slice(0, 6).map((c, i) => ({
+    name: c.name,
+    value: c.net,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+  const recentIncome = incomes.slice(0, 4);
+  const topGoals = allGoals.slice(0, 3);
+  const upcomingBills = allBills.slice(0, 4);
+
   return (
     <div className="mx-auto max-w-7xl">
       <WelcomeHeader onAdd={() => openDialog("expense")} />
