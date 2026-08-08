@@ -295,7 +295,23 @@ export function EntityDialogs({
       />
       <FormDialog open={open === "asset"} onClose={onClose} title={isEdit("asset") ? "Edit asset" : "Add asset"} fields={assetFields} {...common("asset")}
         onSubmit={(v) => {
-          const payload = { name: v.name, type: v.type, purchase: Number(v.purchase), current: Number(v.current), date: v.date || today };
+          const num = (x: unknown) => (x === "" || x === undefined || x === null ? null : Number(x));
+          const payload = {
+            name: v.name,
+            type: v.type,
+            purchase: Number(v.purchase || 0),
+            current: Number(v.current || v.purchase || 0),
+            date: v.date || today,
+            institution: v.institution || null,
+            folio: v.folio || null,
+            units: num(v.units),
+            avgCost: num(v.avgCost),
+            lastPrice: num(v.lastPrice),
+            rate: num(v.rate),
+            compounding: v.compounding || null,
+            maturityDate: v.maturityDate || null,
+            maturityValue: num(v.maturityValue),
+          };
           isEdit("asset") ? f.updateAsset(editId!, payload) : f.addAsset(payload);
         }}
       />
