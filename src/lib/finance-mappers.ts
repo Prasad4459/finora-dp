@@ -178,7 +178,7 @@ export const toLiability = (l: LiabilityRow): Liability => ({
   balance: Number(l.outstanding_balance),
   rate: Number(l.interest_rate),
   emi: Number(l.emi_amount),
-  due: l.next_due_date ?? todayISODate(),
+  due: l.next_due_date ?? todayISODateFn(),
   remaining: l.remaining_months ?? 0,
   status: l.status === "active" ? "Active" : l.status,
 });
@@ -189,7 +189,7 @@ export const toGoal = (g: GoalRow): Goal => ({
   icon: GOAL_ICON_MAP[g.icon ?? ""] ?? PiggyBank,
   target: Number(g.target_amount),
   current: Number(g.saved_amount),
-  date: g.target_date ?? todayISODate(),
+  date: g.target_date ?? todayISODateFn(),
 });
 
 export const toBill = (b: BillRow): Bill => ({
