@@ -133,7 +133,9 @@ export type EditTarget =
   | { kind: "liability"; entity: Liability }
   | { kind: "goal"; entity: Goal }
   | { kind: "budget"; entity: Budget }
-  | { kind: "bill"; entity: Bill };
+  | { kind: "bill"; entity: Bill }
+  /** Not an edit: pre-selects the goal in the "Add to goal" dialog. */
+  | { kind: "contribution"; entity: Goal };
 
 type Ctx = {
   /** True while ANY finance query is in flight — drives the thin top bar only.
