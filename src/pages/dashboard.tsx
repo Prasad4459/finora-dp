@@ -228,7 +228,7 @@ function DashboardInner() {
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-base font-semibold">Income vs Expense</CardTitle>
-              <p className="text-sm text-muted-foreground">Last 7 months</p>
+              <p className="text-sm text-muted-foreground">Last {TREND_MONTHS} months</p>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <LegendDot color="var(--chart-1)" label="Income" />
@@ -298,11 +298,11 @@ function DashboardInner() {
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div>
             <CardTitle className="text-base font-semibold">Net Worth Growth</CardTitle>
-            <p className="text-sm text-muted-foreground">Trailing 7 months</p>
+            <p className="text-sm text-muted-foreground">Trailing {TREND_MONTHS} months</p>
           </div>
           <div className="text-right">
-            <div className="text-lg font-semibold tabular-nums">{currency(1875000)}</div>
-            <div className="text-xs text-primary">+38.4% YTD</div>
+            <div className="text-lg font-semibold tabular-nums">{currency(netWorth)}</div>
+            <div className="text-xs text-primary">{ytdGrowth >= 0 ? "+" : ""}{ytdGrowth}% YTD</div>
           </div>
         </CardHeader>
         <CardContent>
