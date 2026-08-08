@@ -17,6 +17,8 @@ export type Income = {
   source: string;
   category: string;
   account: string;
+  /** Authoritative wallet UUID — never resolved by display name. */
+  walletId: string | null;
   amount: number;
   recurring: boolean;
 };
@@ -27,6 +29,8 @@ export type Expense = {
   merchant: string;
   category: string;
   account: string;
+  /** Authoritative wallet UUID — never resolved by display name. */
+  walletId: string | null;
   method: string;
   amount: number;
 };
