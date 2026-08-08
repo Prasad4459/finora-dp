@@ -7,11 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+/**
+ * `showWhen` makes a field conditional on the values entered so far — used by
+ * instrument-aware forms (an FD asks for a rate, a mutual fund asks for units).
+ * Hidden fields are never submitted and never block submission.
+ */
+type Common = { showWhen?: (values: Record<string, string | boolean>) => boolean; hint?: string };
+
 export type FieldDef =
-  | { key: string; label: string; type: "text" | "number" | "date"; required?: boolean; placeholder?: string; default?: string }
-  | { key: string; label: string; type: "select"; options: readonly string[] | string[]; required?: boolean; default?: string; placeholder?: string }
-  | { key: string; label: string; type: "switch"; default?: string; required?: boolean; placeholder?: string }
-  | { key: string; label: string; type: "textarea"; required?: boolean; placeholder?: string; default?: string };
+  | ({ key: string; label: string; type: "text" | "number" | "date"; required?: boolean; placeholder?: string; default?: string } & Common)
+  | ({ key: string; label: string; type: "select"; options: readonly string[] | string[]; required?: boolean; default?: string; placeholder?: string } & Common)
+  | ({ key: string; label: string; type: "switch"; default?: string; required?: boolean; placeholder?: string } & Common)
+  | ({ key: string; label: string; type: "textarea"; required?: boolean; placeholder?: string; default?: string } & Common);
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -58,7 +65,9 @@ export function FormDialog({
 
   const set = (k: string, v: string | boolean) => setValues((s) => ({ ...s, [k]: v }));
 
-  const canSubmit = fields.every((f) => {
+  const visible = fields.filter((f) => (f.showWhen ? f.showWhen(values) : true));
+
+  const canSubmit = visible.every((f) => {
     if (!f.required) return true;
     const v = values[f.key];
     return typeof v === "string" ? v.trim().length > 0 : true;
@@ -67,7 +76,13 @@ export function FormDialog({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit(values);
+    // Hidden fields must not leak stale values into the payload.
+    const visibleKeys = new Set(visible.map((f) => f.key));
+    const payload: Record<string, string | boolean> = {};
+    Object.entries(values).forEach(([k, v]) => {
+      if (visibleKeys.has(k)) payload[k] = v;
+    });
+    onSubmit(payload);
     onClose();
   };
 
@@ -78,7 +93,7 @@ export function FormDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
-          {fields.map((f) => (
+          {visible.map((f) => (
             <Field key={f.key} label={f.label}>
               {f.type === "select" ? (
                 <Select value={String(values[f.key] ?? "")} onValueChange={(v) => set(f.key, v)}>
