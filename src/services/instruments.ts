@@ -141,7 +141,7 @@ export const INSTRUMENTS: Record<string, InstrumentMeta> = {
   "Digital Gold": m({ label: "Digital Gold", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
   "Gold ETF": m({ label: "Gold ETF", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
   "Gold Fund": m({ label: "Gold Fund", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
-  "Sovereign Gold Bond": m({ label: "Sovereign Gold Bond", assetClass: "gold", valuation: "market", units: true, maturity: true, investment: true, lockInYears: 5, fields: ["institution", "folio", "purchase", "units", "lastPrice", "current", "date", "maturityDate"] }),
+  "Sovereign Gold Bond": m({ label: "Sovereign Gold Bond", assetClass: "gold", valuation: "market", units: true, maturity: true, investment: true, lockInYears: 5, fields: ["institution", "folio", "purchase", "units", "lastPrice", "date", "maturityDate"] }),
 
   Property: m({ label: "Property", assetClass: "physical" }),
   Vehicle: m({ label: "Vehicle", assetClass: "physical" }),
