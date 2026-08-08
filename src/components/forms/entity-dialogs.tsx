@@ -305,13 +305,13 @@ export function EntityDialogs({
       />
       <FormDialog open={open === "income"} onClose={onClose} title={isEdit("income") ? "Edit income" : "Add income"} fields={incomeFields} {...common("income")}
         onSubmit={(v) => {
-          const payload = { source: v.source, category: v.category, account: v.account || "—", amount: Number(v.amount), date: v.date || today, recurring: !!v.recurring };
+          const payload = { source: v.source, category: v.category, account: "", walletId: v.walletId, amount: Number(v.amount), date: v.date || today, recurring: !!v.recurring };
           isEdit("income") ? f.updateIncome(editId!, payload) : f.addIncome(payload);
         }}
       />
       <FormDialog open={open === "expense"} onClose={onClose} title={isEdit("expense") ? "Edit expense" : "Add expense"} fields={expenseFields} {...common("expense")}
         onSubmit={(v) => {
-          const payload = { merchant: v.merchant, category: v.category, account: v.account || "—", method: v.method || "UPI", amount: Number(v.amount), date: v.date || today };
+          const payload = { merchant: v.merchant, category: v.category, account: "", walletId: v.walletId, method: v.method || "UPI", amount: Number(v.amount), date: v.date || today };
           isEdit("expense") ? f.updateExpense(editId!, payload) : f.addExpense(payload);
         }}
       />
@@ -357,18 +357,29 @@ export function EntityDialogs({
       />
       <FormDialog open={open === "bill"} onClose={onClose} title={isEdit("bill") ? "Edit bill" : "Add bill"} fields={billFields} {...common("bill")}
         onSubmit={(v) => {
-          const payload = { name: v.name, category: v.category, iconKey: v.iconKey || "Receipt", amount: Number(v.amount), due: v.due || todayDMY() };
+          const payload = {
+            name: v.name,
+            category: v.category,
+            iconKey: v.iconKey || "Receipt",
+            amount: Number(v.amount),
+            due: v.due || todayDMY(),
+            frequency: v.frequency,
+            walletId: v.walletId || undefined,
+            description: v.description,
+            reminderEnabled: !!v.reminderEnabled,
+            reminderDays: v.reminderDays,
+          };
           isEdit("bill") ? f.updateBill(editId!, payload) : f.addBill(payload);
         }}
       />
       <FormDialog open={open === "transfer"} onClose={onClose} title="Transfer between accounts" fields={transferFields}
-        onSubmit={(v) => f.addTransfer({ from: v.from, to: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+        onSubmit={(v) => f.addTransfer({ fromWalletId: v.from, toWalletId: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
       />
       <FormDialog open={open === "investment"} onClose={onClose} title="Record investment" fields={investmentFields}
         onSubmit={(v) =>
           f.addInvestment({
             asset: v.asset,
-            account: v.account,
+            walletId: v.walletId,
             amount: Number(v.amount),
             date: v.date || today,
             notes: v.notes,
@@ -382,7 +393,7 @@ export function EntityDialogs({
         onSubmit={(v) =>
           f.addRedemption({
             asset: v.asset,
-            account: v.account,
+            walletId: v.walletId,
             amount: Number(v.amount),
             units: v.units ? Number(v.units) : undefined,
             date: v.date || today,
@@ -394,7 +405,7 @@ export function EntityDialogs({
         onSubmit={(v) =>
           f.addSip({
             asset: v.asset,
-            account: v.account,
+            walletId: v.walletId,
             amount: Number(v.amount),
             frequency: v.frequency || "Monthly",
             nextDue: v.nextDue || today,
@@ -403,16 +414,16 @@ export function EntityDialogs({
         }
       />
       <FormDialog open={open === "dividend"} onClose={onClose} title="Record dividend" fields={dividendFields}
-        onSubmit={(v) => f.addDividend({ source: v.source, account: v.account, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addDividend({ source: v.source, walletId: v.walletId, amount: Number(v.amount), date: v.date || today })}
       />
       <FormDialog open={open === "refund"} onClose={onClose} title="Record refund" fields={refundFields}
-        onSubmit={(v) => f.addRefund({ merchant: v.merchant, category: v.category, account: v.account, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addRefund({ merchant: v.merchant, category: v.category, walletId: v.walletId, amount: Number(v.amount), date: v.date || today })}
       />
       <FormDialog open={open === "emi"} onClose={onClose} title="Record EMI payment" fields={emiFields}
-        onSubmit={(v) => f.addEmiPayment({ liability: v.liability, account: v.account, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
+        onSubmit={(v) => f.addEmiPayment({ liability: v.liability, walletId: v.walletId, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
       />
       <FormDialog open={open === "contribution"} onClose={onClose} title="Add to goal" fields={contributionFields}
-        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, account: v.account, to: v.to, amount: Number(v.amount), date: v.date || today })}
+        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, fromWalletId: v.walletId, toWalletId: v.to, amount: Number(v.amount), date: v.date || today })}
       />
     </>
   );
