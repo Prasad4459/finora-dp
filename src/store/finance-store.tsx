@@ -2,8 +2,13 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from "re
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { EntityDialogs } from "@/components/forms/entity-dialogs";
-import { assetsRepo, categoriesRepo } from "@/repositories";
-import { financeKeys } from "@/hooks/query-keys";
+import {
+  assetsRepo,
+  categoriesRepo,
+  investmentContributionsRepo,
+  transactionsRepo,
+} from "@/repositories";
+import { financeKeys, keysForTransaction } from "@/hooks/query-keys";
 import { errorMessage } from "@/hooks/use-entity-mutation";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
@@ -155,6 +160,14 @@ type Ctx = {
   addEmiPayment: (v: EmiInput) => void;
   addGoalContribution: (v: ContributionInput) => void;
   assets: Asset[]; addAsset: (v: AssetInput) => void; updateAsset: (id: string, v: AssetInput) => void; removeAsset: (id: string) => void;
+  /**
+   * Safe removal of an investment holding. Refuses to delete silently when the
+   * holding has linked ledger rows: the caller must pass
+   * `reverseTransactions: true`, which DELETES those transactions so the
+   * database trigger reverses their wallet / asset effects. Balances are never
+   * edited by hand.
+   */
+  removeInvestment: (assetId: string, opts?: { reverseTransactions?: boolean }) => Promise<void>;
   liabilities: Liability[]; addLiability: (v: LiabilityInput) => void; updateLiability: (id: string, v: LiabilityInput) => void; removeLiability: (id: string) => void;
   goals: Goal[]; addGoal: (v: GoalInput) => void; updateGoal: (id: string, v: GoalInput) => void; removeGoal: (id: string) => void;
   budgets: Budget[]; addBudget: (v: BudgetInput) => void; updateBudget: (id: string, v: BudgetInput) => void; removeBudget: (id: string) => void;
