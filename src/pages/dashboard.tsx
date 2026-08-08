@@ -108,7 +108,7 @@ function WelcomeHeader({ onAdd }: { onAdd: () => void }) {
 
 function DashboardInner() {
   const {
-    openDialog, accounts, incomes, expenses, liabilities, bills: allBills, goals: allGoals,
+    openDialog, accounts, incomes, liabilities, bills: allBills, goals: allGoals,
     totals, transactions: ledger, summary,
   } = useFinance();
   // All financial maths lives in the pure services layer (via the store).
