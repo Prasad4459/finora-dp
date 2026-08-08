@@ -87,4 +87,9 @@ export type EntityKind =
   | "liability"
   | "goal"
   | "budget"
-  | "bill";
+  | "bill"
+  | "transfer"
+  | "investment"
+  | "dividend"
+  | "refund"
+  | "emi";
