@@ -102,6 +102,7 @@ export function Income() {
                   <TableCell className="text-muted-foreground">{formatDateIN(i.date)}</TableCell>
                   <TableCell className="font-medium">
                     {i.source}
+                    {i.txType === "refund" && <Badge variant="secondary" className="ml-2 text-[10px]">Refund</Badge>}
                     {i.recurring && <Badge variant="secondary" className="ml-2 text-[10px]">Recurring</Badge>}
                   </TableCell>
                   <TableCell><Badge variant="outline" className="text-[10px]">{i.category}</Badge></TableCell>
