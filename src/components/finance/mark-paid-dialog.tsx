@@ -56,7 +56,6 @@ export function MarkPaidDialog({
             <Label className="text-xs">Paid from account</Label>
             <Select value={walletId} onValueChange={setWalletId}>
               <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-            {/* A bill payment can never post without an account. */}
               <SelectContent>
                 {wallets.map((w) => (
                   <SelectItem key={w.id} value={w.id}>
