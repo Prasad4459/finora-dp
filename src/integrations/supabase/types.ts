@@ -627,6 +627,8 @@ export type Database = {
           amount: number
           asset_id: string | null
           attachment_url: string | null
+          bill_id: string | null
+          bill_occurrence_date: string | null
           category_id: string | null
           created_at: string
           goal_id: string | null
@@ -652,6 +654,8 @@ export type Database = {
           amount: number
           asset_id?: string | null
           attachment_url?: string | null
+          bill_id?: string | null
+          bill_occurrence_date?: string | null
           category_id?: string | null
           created_at?: string
           goal_id?: string | null
@@ -677,6 +681,8 @@ export type Database = {
           amount?: number
           asset_id?: string | null
           attachment_url?: string | null
+          bill_id?: string | null
+          bill_occurrence_date?: string | null
           category_id?: string | null
           created_at?: string
           goal_id?: string | null
@@ -704,6 +710,13 @@ export type Database = {
             columns: ["asset_id"]
             isOneToOne: false
             referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
             referencedColumns: ["id"]
           },
           {
