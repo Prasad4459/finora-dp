@@ -337,17 +337,18 @@ function DashboardInner() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="space-y-4">
-            {goals.map((g) => {
-              const pct = Math.round((g.saved / g.target) * 100);
+            {topGoals.length === 0 && <p className="text-sm text-muted-foreground">No goals yet.</p>}
+            {topGoals.map((g) => {
+              const pct = percentOf(g.current, g.target);
               return (
                 <div key={g.id}>
                   <div className="mb-1.5 flex items-center justify-between text-sm">
                     <div className="font-medium">{g.name}</div>
-                    <div className="text-xs text-muted-foreground">ETA {g.eta}</div>
+                    <div className="text-xs text-muted-foreground">By {formatDateIN(g.date)}</div>
                   </div>
-                  <Progress value={pct} className="h-2" />
+                  <Progress value={Math.min(100, pct)} className="h-2" />
                   <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
-                    <span>{currency(g.saved)} of {currency(g.target)}</span>
+                    <span>{currency(g.current)} of {currency(g.target)}</span>
                     <span className="font-medium text-foreground">{pct}%</span>
                   </div>
                 </div>
@@ -390,14 +391,17 @@ function DashboardInner() {
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
+              {recentIncome.length === 0 && (
+                <li className="px-5 py-6 text-sm text-muted-foreground">No income recorded yet.</li>
+              )}
               {recentIncome.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
                     <ArrowDownCircle className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{i.name}</div>
-                    <div className="text-xs text-muted-foreground">{i.date}</div>
+                    <div className="truncate text-sm font-medium">{i.source}</div>
+                    <div className="text-xs text-muted-foreground">{formatDateIN(i.date)}</div>
                   </div>
                   <div className="text-sm font-semibold text-primary tabular-nums">+{currency(i.amount)}</div>
                 </li>
