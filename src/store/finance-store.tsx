@@ -577,7 +577,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           transaction_date: v.date || todayISODate(),
           wallet_id: requireWalletId(v.walletId, "Destination account"),
           payee: v.merchant,
-          category_id: await resolveCategoryId(v.category || "Refund", "expense"),
+          // A refund always points at the ORIGINAL expense category so it nets
+          // against that spending. It is never an income-side category.
+          category_id: await resolveCategoryId(v.category || "Others", "expense"),
         }),
       ),
 

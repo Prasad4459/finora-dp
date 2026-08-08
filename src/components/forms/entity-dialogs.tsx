@@ -272,7 +272,7 @@ export function EntityDialogs({
 
   const refundFields: FieldDef[] = [
     { key: "merchant", label: "Refunded by", type: "text", required: true },
-    { key: "category", label: "Original category", type: "select", options: EXPENSE_CATEGORIES as unknown as string[] },
+    { key: "category", label: "Original expense category", type: "select", options: EXPENSE_CATEGORIES as unknown as string[], required: true, placeholder: "Select category" },
     walletField("walletId", "Credited to account"),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "date", label: "Date", type: "date", default: today },
