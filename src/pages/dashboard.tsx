@@ -50,60 +50,21 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatINR, formatINRExact, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
-import { computeHealthScore } from "@/services/finance";
+import { computeHealthScore, netWorthChange, percentOf } from "@/services/finance";
+import { monthShortLabel } from "@/lib/date-in";
 import { TRANSACTION_LABEL } from "@/lib/transaction-view";
 import { formatDateIN } from "@/lib/format";
 
 
-const cashFlowData = [
-  { month: "Jan", income: 82000, expense: 41000 },
-  { month: "Feb", income: 85000, expense: 44000 },
-  { month: "Mar", income: 85000, expense: 47000 },
-  { month: "Apr", income: 90000, expense: 42000 },
-  { month: "May", income: 88000, expense: 51000 },
-  { month: "Jun", income: 92000, expense: 48000 },
-  { month: "Jul", income: 85000, expense: 42500 },
+const CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--muted-foreground)",
 ];
-
-const netWorthData = [
-  { month: "Jan", value: 1250000 },
-  { month: "Feb", value: 1340000 },
-  { month: "Mar", value: 1450000 },
-  { month: "Apr", value: 1580000 },
-  { month: "May", value: 1690000 },
-  { month: "Jun", value: 1780000 },
-  { month: "Jul", value: 1875000 },
-];
-
-const expenseBreakdown = [
-  { name: "Rent", value: 18000, color: "var(--chart-1)" },
-  { name: "Groceries", value: 8500, color: "var(--chart-2)" },
-  { name: "Fuel", value: 4200, color: "var(--chart-3)" },
-  { name: "EMI", value: 6500, color: "var(--chart-4)" },
-  { name: "Entertainment", value: 2800, color: "var(--chart-5)" },
-  { name: "Miscellaneous", value: 2500, color: "var(--muted-foreground)" },
-];
-
-
-const upcomingBills = [
-  { id: 1, name: "Rent", due: "05/07/2026", amount: 18000, icon: Home },
-  { id: 2, name: "Electricity", due: "08/07/2026", amount: 2450, icon: Zap },
-  { id: 3, name: "Jio Fiber", due: "12/07/2026", amount: 999, icon: Wifi },
-  { id: 4, name: "HDFC Credit Card", due: "15/07/2026", amount: 12500, icon: CreditCard },
-];
-
-const recentIncome = [
-  { id: 1, name: "Salary — Infosys Ltd.", date: "01/07/2026", amount: 85000 },
-  { id: 2, name: "Freelance — Acme Co.", date: "28/06/2026", amount: 22000 },
-  { id: 3, name: "TCS Dividend", date: "15/06/2026", amount: 3600 },
-  { id: 4, name: "SBI Interest", date: "20/06/2026", amount: 1240 },
-];
-
-const goals = [
-  { id: 1, name: "Emergency Fund", target: 500000, saved: 325000, eta: "Mar 2027" },
-  { id: 2, name: "Goa Vacation", target: 80000, saved: 46000, eta: "Dec 2026" },
-  { id: 3, name: "New MacBook", target: 220000, saved: 90000, eta: "Feb 2027" },
-];
+const TREND_MONTHS = 7;
 
 const currency = formatINR;
 const currencyExact = formatINRExact;
@@ -147,8 +108,8 @@ function WelcomeHeader({ onAdd }: { onAdd: () => void }) {
 
 function DashboardInner() {
   const {
-    openDialog, accounts, incomes, expenses, liabilities, bills: allBills, goals: allGoals,
-    totals, transactions: ledger,
+    openDialog, accounts, incomes, liabilities, bills: allBills, goals: allGoals,
+    totals, transactions: ledger, summary,
   } = useFinance();
   // All financial maths lives in the pure services layer (via the store).
   const { totalBalance, totalInvestments, totalDebt, netWorth, monthIncome, monthExpenses, savingsRate } = totals;
@@ -156,6 +117,38 @@ function DashboardInner() {
   const health = computeHealthScore(totals);
   const healthScore = health.score;
   const recent = ledger.slice(0, 6);
+
+  // ---- Server-aggregated series (never derived from the paginated list) ----
+  const series = summary.series(TREND_MONTHS);
+  const cashFlowData = series.map(({ ref, metrics }) => ({
+    month: monthShortLabel(ref),
+    income: metrics.grossIncome,
+    expense: metrics.consumptionExpense,
+  }));
+
+  // Net worth is only known for today, so the curve is reconstructed backwards
+  // by removing each month's net-worth change.
+  const netWorthData = (() => {
+    const points: Array<{ month: string; value: number }> = [];
+    let running = netWorth;
+    for (let i = series.length - 1; i >= 0; i--) {
+      points.unshift({ month: monthShortLabel(series[i].ref), value: Math.round(running) });
+      running -= netWorthChange(series[i].metrics);
+    }
+    return points;
+  })();
+  const ytd = summary.ytd();
+  const ytdGrowth = percentOf(netWorthChange(ytd), Math.max(1, netWorth - netWorthChange(ytd)));
+
+  const expenseBreakdown = summary.categorySpend(summary.current).slice(0, 6).map((c, i) => ({
+    name: c.name,
+    value: c.net,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+  const recentIncome = incomes.slice(0, 4);
+  const topGoals = allGoals.slice(0, 3);
+  const upcomingBills = allBills.slice(0, 4);
+
   return (
     <div className="mx-auto max-w-7xl">
       <WelcomeHeader onAdd={() => openDialog("expense")} />
@@ -164,8 +157,8 @@ function DashboardInner() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total balance" value={currency(totalBalance)} delta={`Across ${accounts.length} accounts`} icon={Wallet} />
         <StatCard label="Net worth" value={currency(netWorth)} delta="Assets − Liabilities" icon={TrendingUp} tone="positive" />
-        <StatCard label="Monthly income" value={currency(monthIncome)} delta={`${incomes.length} entries`} icon={ArrowDownCircle} tone="positive" />
-        <StatCard label="Monthly expenses" value={currency(monthExpenses)} delta={`${expenses.length} entries`} icon={ArrowUpCircle} tone="negative" />
+        <StatCard label="Monthly income" value={currency(monthIncome)} delta="Salary, dividends & other credits" icon={ArrowDownCircle} tone="positive" />
+        <StatCard label="Monthly expenses" value={currency(monthExpenses)} delta="Spending + EMI interest − refunds" icon={ArrowUpCircle} tone="negative" />
         <StatCard label="Savings rate" value={`${savingsRate}%`} delta={savingsRate >= 40 ? "Healthy — above 40%" : "Aim for 40%+"} icon={PiggyBank} tone={savingsRate >= 40 ? "positive" : "neutral"} />
         <StatCard label="Total investments" value={currency(totalInvestments)} delta="MF, Stocks, PPF, EPF" icon={TrendingUp} />
         <StatCard label="Total debt" value={currency(totalDebt)} delta={`${liabilities.length} liabilities`} icon={CreditCard} tone="negative" />
@@ -235,7 +228,7 @@ function DashboardInner() {
           <CardHeader className="flex flex-row items-start justify-between space-y-0">
             <div>
               <CardTitle className="text-base font-semibold">Income vs Expense</CardTitle>
-              <p className="text-sm text-muted-foreground">Last 7 months</p>
+              <p className="text-sm text-muted-foreground">Last {TREND_MONTHS} months</p>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <LegendDot color="var(--chart-1)" label="Income" />
@@ -305,11 +298,11 @@ function DashboardInner() {
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
           <div>
             <CardTitle className="text-base font-semibold">Net Worth Growth</CardTitle>
-            <p className="text-sm text-muted-foreground">Trailing 7 months</p>
+            <p className="text-sm text-muted-foreground">Trailing {TREND_MONTHS} months</p>
           </div>
           <div className="text-right">
-            <div className="text-lg font-semibold tabular-nums">{currency(1875000)}</div>
-            <div className="text-xs text-primary">+38.4% YTD</div>
+            <div className="text-lg font-semibold tabular-nums">{currency(netWorth)}</div>
+            <div className="text-xs text-primary">{ytdGrowth >= 0 ? "+" : ""}{ytdGrowth}% YTD</div>
           </div>
         </CardHeader>
         <CardContent>
@@ -344,17 +337,18 @@ function DashboardInner() {
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="space-y-4">
-            {goals.map((g) => {
-              const pct = Math.round((g.saved / g.target) * 100);
+            {topGoals.length === 0 && <p className="text-sm text-muted-foreground">No goals yet.</p>}
+            {topGoals.map((g) => {
+              const pct = percentOf(g.current, g.target);
               return (
                 <div key={g.id}>
                   <div className="mb-1.5 flex items-center justify-between text-sm">
                     <div className="font-medium">{g.name}</div>
-                    <div className="text-xs text-muted-foreground">ETA {g.eta}</div>
+                    <div className="text-xs text-muted-foreground">By {formatDateIN(g.date)}</div>
                   </div>
-                  <Progress value={pct} className="h-2" />
+                  <Progress value={Math.min(100, pct)} className="h-2" />
                   <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground tabular-nums">
-                    <span>{currency(g.saved)} of {currency(g.target)}</span>
+                    <span>{currency(g.current)} of {currency(g.target)}</span>
                     <span className="font-medium text-foreground">{pct}%</span>
                   </div>
                 </div>
@@ -375,14 +369,14 @@ function DashboardInner() {
             <div className="flex items-end gap-2">
               <div className="text-5xl font-semibold tracking-tight">{healthScore}</div>
               <div className="pb-1 text-sm text-muted-foreground">/ 100</div>
-              <Badge variant="secondary" className="ml-auto">Good</Badge>
+              <Badge variant="secondary" className="ml-auto">{health.label}</Badge>
             </div>
             <Progress value={healthScore} className="mt-4 h-2" />
             <ul className="mt-4 space-y-2 text-xs">
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Savings rate</span><span className="font-medium text-primary">Excellent</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Debt-to-income</span><span className="font-medium">Healthy</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Emergency runway</span><span className="font-medium">7.6 months</span></li>
-              <li className="flex items-center justify-between"><span className="text-muted-foreground">Investment diversity</span><span className="font-medium">Balanced</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Savings rate</span><span className="font-medium text-primary">{savingsRate}%</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Monthly cash outflow</span><span className="font-medium">{currency(totals.monthCashOutflow)}</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Emergency runway</span><span className="font-medium">{health.runwayMonths} months</span></li>
+              <li className="flex items-center justify-between"><span className="text-muted-foreground">Invested this month</span><span className="font-medium">{currency(totals.monthInvested)}</span></li>
             </ul>
           </CardContent>
         </Card>
@@ -397,14 +391,17 @@ function DashboardInner() {
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
+              {recentIncome.length === 0 && (
+                <li className="px-5 py-6 text-sm text-muted-foreground">No income recorded yet.</li>
+              )}
               {recentIncome.map((i) => (
                 <li key={i.id} className="flex items-center gap-3 px-5 py-3">
                   <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
                     <ArrowDownCircle className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{i.name}</div>
-                    <div className="text-xs text-muted-foreground">{i.date}</div>
+                    <div className="truncate text-sm font-medium">{i.source}</div>
+                    <div className="text-xs text-muted-foreground">{formatDateIN(i.date)}</div>
                   </div>
                   <div className="text-sm font-semibold text-primary tabular-nums">+{currency(i.amount)}</div>
                 </li>
@@ -421,9 +418,12 @@ function DashboardInner() {
           <p className="text-sm text-muted-foreground">Where most of your money went this month</p>
         </CardHeader>
         <CardContent className="space-y-3">
+          {expenseBreakdown.length === 0 && (
+            <p className="text-sm text-muted-foreground">No spending recorded this month.</p>
+          )}
           {expenseBreakdown.slice(0, 5).map((c) => {
             const total = expenseBreakdown.reduce((s, x) => s + x.value, 0);
-            const pct = Math.round((c.value / total) * 100);
+            const pct = percentOf(c.value, total);
             return (
               <div key={c.name}>
                 <div className="mb-1 flex items-center justify-between text-sm">
@@ -509,8 +509,11 @@ function DashboardInner() {
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
+              {upcomingBills.length === 0 && (
+                <li className="px-5 py-6 text-sm text-muted-foreground">No bills scheduled.</li>
+              )}
               {upcomingBills.map((b) => {
-                const Icon = b.icon;
+                const Icon = b.icon ?? Receipt;
                 return (
                   <li key={b.id} className="flex items-center gap-3 px-5 py-3">
                     <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
@@ -519,7 +522,7 @@ function DashboardInner() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{b.name}</div>
                       <Badge variant="secondary" className="mt-0.5 h-5 px-1.5 text-[10px] font-normal">
-                        Due {b.due}
+                        Due {formatDateIN(b.due)}
                       </Badge>
                     </div>
                     <div className="text-sm font-semibold tabular-nums">{currencyExact(b.amount)}</div>

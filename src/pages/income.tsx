@@ -8,22 +8,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
+import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
 
-
-const trend = [
-  { month: "Feb", value: 92000 },
-  { month: "Mar", value: 104000 },
-  { month: "Apr", value: 108000 },
-  { month: "May", value: 96000 },
-  { month: "Jun", value: 130290 },
-  { month: "Jul", value: 85000 },
-];
+const TREND_MONTHS = 6;
 
 export function Income() {
-  const { incomes, openDialog, openEditDialog, removeIncome, totals, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  const { incomes, openDialog, openEditDialog, removeIncome, totals, summary, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  // All totals below come from server-side aggregates, not the loaded page.
   const monthTotal = totals.monthIncome;
-  const ytd = incomes.reduce((s, i) => s + i.amount, 0);
-  const avg = Math.round(ytd / 6);
+  const previous = summary.metricsFor(addMonths(summary.current, -1)).grossIncome;
+  const ytdMetrics = summary.ytd();
+  const ytd = ytdMetrics.grossIncome;
+  const avg = Math.round(ytd / Math.max(1, summary.current.month));
+  const today = todayISO();
+  const todayTotal = incomes
+    .filter((i) => i.date === today && i.category !== "Refund")
+    .reduce((s, i) => s + i.amount, 0);
+  const trend = summary.series(TREND_MONTHS).map(({ ref, metrics }) => ({
+    month: monthShortLabel(ref),
+    value: metrics.grossIncome,
+  }));
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
@@ -37,10 +41,10 @@ export function Income() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today" value={formatINR(0)} icon={Calendar} />
-        <StatCard label="This month" value={formatINR(monthTotal)} tone="positive" icon={ArrowDownCircle} />
-        <StatCard label="This year" value={formatINR(ytd)} tone="positive" icon={ArrowDownCircle} />
-        <StatCard label="Avg / month" value={formatINR(avg)} icon={TrendingUp} />
+        <StatCard label="Today" value={formatINR(todayTotal)} icon={Calendar} />
+        <StatCard label="This month" value={formatINR(monthTotal)} delta={`Last month ${formatINR(previous)}`} tone="positive" icon={ArrowDownCircle} />
+        <StatCard label="Year to date" value={formatINR(ytd)} tone="positive" icon={ArrowDownCircle} />
+        <StatCard label="Avg / month" value={formatINR(avg)} delta={`Across ${summary.current.month} months`} icon={TrendingUp} />
       </div>
 
       <Card className="mt-6 border-border/70">

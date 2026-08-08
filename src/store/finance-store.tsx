@@ -14,7 +14,9 @@ import { useGoals } from "@/hooks/use-goals";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useBills } from "@/hooks/use-bills";
 import { useNotifications } from "@/hooks/use-notifications";
-import { computeTotals, currentMonthKey, isInMonth, type FinanceTotals } from "@/services/finance";
+import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
+import { computeTotals, type FinanceTotals } from "@/services/finance";
+import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import { toTransactionView, type TransactionView } from "@/lib/transaction-view";
 import {
   assetTypeFromLabel,
@@ -56,7 +58,7 @@ export type TransferInput = { from: string; to: string; amount: number; date: st
 export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
 export type DividendInput = { source: string; account: string; amount: number; date: string };
 export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
-export type ContributionInput = { goal: string; account: string; amount: number; date: string };
+export type ContributionInput = { goal: string; account: string; to: string; amount: number; date: string };
 export type EmiInput = {
   liability: string;
   account: string;
@@ -80,6 +82,8 @@ export type EditTarget =
 type Ctx = {
   loading: boolean;
   totals: FinanceTotals;
+  /** Server-side aggregates: the only valid source of financial totals. */
+  summary: FinanceSummary;
   /** Unified ledger — every supported transaction type, newest first. */
   transactions: TransactionView[];
   hasMoreTransactions: boolean;
@@ -128,9 +132,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const billsData = useBills();
   const notificationsData = useNotifications();
 
+  // Every budget must be able to show ITS OWN period, so the aggregate window
+  // is widened to cover all stored budget periods.
+  const budgetPeriods = useMemo<MonthRef[]>(
+    () => budgetsData.rows.map((b) => ({ year: b.period_year, month: b.period_month })),
+    [budgetsData.rows],
+  );
+  const summary = useFinanceSummary({ extraMonths: budgetPeriods, trailingMonths: 12 });
+
   const loading =
     wallets.isLoading || categories.isLoading || transactions.isLoading || assetsData.isLoading ||
-    liabilitiesData.isLoading || goalsData.isLoading || budgetsData.isLoading || billsData.isLoading;
+    liabilitiesData.isLoading || goalsData.isLoading || budgetsData.isLoading || billsData.isLoading ||
+    summary.isLoading;
 
   const walletRows = useMemo<Wallet[]>(() => wallets.rows, [wallets.rows]);
   const categoryRows = useMemo<Category[]>(() => categories.rows, [categories.rows]);
@@ -178,28 +191,44 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const bills = useMemo(() => billsData.rows.map(toBill), [billsData.rows]);
   const notifications = useMemo(() => notificationsData.rows, [notificationsData.rows]);
 
+  // Totals always describe the CURRENT IST month and come from the server-side
+  // aggregate, never from the paginated transaction list.
   const totals = useMemo(
-    () => computeTotals({ accounts, assets, liabilities, transactions: ledger }),
-    [accounts, assets, liabilities, ledger],
+    () => computeTotals({ accounts, assets, liabilities, month: summary.metricsFor(summary.current) }),
+    [accounts, assets, liabilities, summary.categoryRows, summary.isLoading, summary.current.year, summary.current.month],
   );
 
-  // Budgets: the limit comes from the budgets table; "spent" is derived from this
-  // month's expense transactions matched on category id (name only as fallback).
-  const budgets = useMemo<Budget[]>(() => {
-    const monthKey = currentMonthKey();
-    return budgetsData.rows.map((b) => {
-      const name = b.name ?? categoryName(b.category_id);
-      const spent = ledger
-        .filter((t) => t.type === "expense" && isInMonth(t.date, monthKey))
-        .filter((t) => (b.category_id ? t.categoryId === b.category_id : t.category.toLowerCase() === name.toLowerCase()))
-        .reduce((s, t) => s + t.amount, 0);
-      const refunded = ledger
-        .filter((t) => t.type === "refund" && isInMonth(t.date, monthKey))
-        .filter((t) => (b.category_id ? t.categoryId === b.category_id : t.category.toLowerCase() === name.toLowerCase()))
-        .reduce((s, t) => s + t.amount, 0);
-      return { id: b.id, name, budget: Number(b.amount), spent: Math.max(0, spent - refunded), categoryId: b.category_id };
-    });
-  }, [budgetsData.rows, ledger, categoryRows]);
+  // Budgets: the limit comes from the budgets table; "spent" is aggregated by
+  // Postgres for the budget's OWN period_year / period_month — never for the
+  // current month.
+  const budgets = useMemo<Budget[]>(
+    () =>
+      budgetsData.rows.map((b) => {
+        const name = b.name ?? categoryName(b.category_id);
+        const period: MonthRef = { year: b.period_year, month: b.period_month };
+        const rows = summary.categoryRows.filter(
+          (r) =>
+            Number(r.y) === period.year &&
+            Number(r.m) === period.month &&
+            (b.category_id
+              ? r.category_id === b.category_id
+              : (r.category_name ?? "").toLowerCase() === name.toLowerCase()),
+        );
+        const spent = rows.filter((r) => r.tx_type === "expense").reduce((s, r) => s + Number(r.total ?? 0), 0);
+        const refunded = rows.filter((r) => r.tx_type === "refund").reduce((s, r) => s + Number(r.total ?? 0), 0);
+        return {
+          id: b.id,
+          name,
+          budget: Number(b.amount),
+          spent: Math.max(0, spent - refunded),
+          categoryId: b.category_id,
+          periodYear: period.year,
+          periodMonth: period.month,
+          periodLabel: monthLongLabel(period),
+        };
+      }),
+    [budgetsData.rows, summary.categoryRows, categoryRows],
+  );
 
   /** Finds a category by name (creating it when missing) so records stay linked. */
   const resolveCategoryId = async (name: string, kind: CategoryKind): Promise<string | null> => {
@@ -232,12 +261,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   /* ---------- UI input -> database payload mappers ---------- */
 
-  const walletPayload = (v: AccountInput) => ({
+  // WALLET BALANCE AUTHORITY
+  // A wallet's running balance is ledger-derived: opening_balance + every
+  // transaction effect applied by the database trigger. Only creation sets a
+  // balance (the opening balance); editing an account can never overwrite the
+  // calculated balance.
+  const walletCreatePayload = (v: AccountInput) => ({
     name: v.name,
     institution: v.bank,
     type: walletTypeFromLabel(v.type),
     icon: v.type,
+    opening_balance: v.balance,
     balance: v.balance,
+  });
+
+  const walletUpdatePayload = (v: AccountInput) => ({
+    name: v.name,
+    institution: v.bank,
+    type: walletTypeFromLabel(v.type),
+    icon: v.type,
   });
 
   const incomePayload = async (v: IncomeInput) => ({
@@ -304,19 +346,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       budgetsData.update.mutate({ id: existing.id, values: { name: v.name, amount: v.budget, category_id } });
       return;
     }
-    const now = new Date();
+    // New budgets are created for the current INDIAN calendar month.
+    const period = currentMonth();
     budgetsData.create.mutate({
       name: v.name,
       amount: v.budget,
       category_id,
-      period_month: now.getMonth() + 1,
-      period_year: now.getFullYear(),
+      period_month: period.month,
+      period_year: period.year,
     });
   };
 
   const value: Ctx = {
     loading,
     totals,
+    summary,
     transactions: ledger,
     hasMoreTransactions: transactions.hasMore,
     isLoadingMoreTransactions: transactions.isLoadingMore,
@@ -324,8 +368,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     removeTransaction: (id) => transactions.remove.mutate(id),
     accounts, incomes, expenses, assets, liabilities, goals, budgets, bills, notifications,
 
-    addAccount: (v) => wallets.create.mutate(walletPayload(v)),
-    updateAccount: (id, v) => wallets.update.mutate({ id, values: walletPayload(v) }),
+    addAccount: (v) => wallets.create.mutate(walletCreatePayload(v)),
+    updateAccount: (id, v) => wallets.update.mutate({ id, values: walletUpdatePayload(v) }),
     removeAccount: (id) => wallets.remove.mutate(id),
 
     addIncome: (v) => run(async () => createTx(await incomePayload(v))),
@@ -417,17 +461,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         } as Omit<TransactionInsert, "user_id">);
       }),
 
-    // Goal contribution: money leaves a wallet and is linked to the goal, so the
-    // goal's saved amount is derived from a real transaction (and reversible).
+    // GOAL ACCOUNTING
+    // A goal is an *allocation label*, not a place money goes to. A
+    // contribution is therefore a real transfer between two real wallets
+    // (e.g. HDFC Savings -> Emergency Fund savings account) tagged with
+    // goal_id. The trigger debits the source, credits the destination and
+    // raises the goal's saved amount — so net worth is unchanged and editing
+    // or deleting the row reverses all three effects atomically.
     addGoalContribution: (v) =>
       run(async () => {
         const goal = goalsData.rows.find((g) => g.name.toLowerCase() === v.goal.toLowerCase());
         if (!goal) throw new Error(`Goal "${v.goal}" was not found`);
+        const from = requireWalletId(v.account, "Source");
+        const to = requireWalletId(v.to, "Destination");
+        if (from === to) throw new Error("Choose a different account to hold the goal money");
         createTx({
           type: "transfer",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Source"),
+          wallet_id: from,
+          to_wallet_id: to,
           goal_id: goal.id,
           payee: v.goal,
           notes: "Goal contribution",

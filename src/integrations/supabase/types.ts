@@ -581,6 +581,7 @@ export type Database = {
           institution: string | null
           is_active: boolean
           name: string
+          opening_balance: number
           type: Database["public"]["Enums"]["wallet_type"]
           updated_at: string
           user_id: string
@@ -597,6 +598,7 @@ export type Database = {
           institution?: string | null
           is_active?: boolean
           name: string
+          opening_balance?: number
           type: Database["public"]["Enums"]["wallet_type"]
           updated_at?: string
           user_id: string
@@ -613,6 +615,7 @@ export type Database = {
           institution?: string | null
           is_active?: boolean
           name?: string
+          opening_balance?: number
           type?: Database["public"]["Enums"]["wallet_type"]
           updated_at?: string
           user_id?: string
@@ -630,6 +633,29 @@ export type Database = {
           _t: Database["public"]["Tables"]["transactions"]["Row"]
         }
         Returns: undefined
+      }
+      tx_category_monthly: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          category_id: string
+          category_name: string
+          m: number
+          total: number
+          tx_type: Database["public"]["Enums"]["transaction_type"]
+          y: number
+        }[]
+      }
+      tx_summary_monthly: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          interest_total: number
+          m: number
+          principal_total: number
+          total: number
+          tx_count: number
+          tx_type: Database["public"]["Enums"]["transaction_type"]
+          y: number
+        }[]
       }
     }
     Enums: {

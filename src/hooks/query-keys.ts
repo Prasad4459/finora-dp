@@ -5,6 +5,9 @@ export const financeKeys = {
   wallets: ["wallets"] as const,
   categories: ["categories"] as const,
   transactions: ["transactions"] as const,
+  /** Server-side monthly aggregates (never derived from the loaded page). */
+  summary: ["finance-summary"] as const,
+  categorySummary: ["finance-category-summary"] as const,
   assets: ["assets"] as const,
   liabilities: ["liabilities"] as const,
   goals: ["goals"] as const,
@@ -22,6 +25,8 @@ export const financeKeys = {
  */
 export const FINANCE_DERIVED_KEYS: readonly QueryKey[] = [
   financeKeys.transactions,
+  financeKeys.summary,
+  financeKeys.categorySummary,
   financeKeys.wallets,
   financeKeys.assets,
   financeKeys.liabilities,

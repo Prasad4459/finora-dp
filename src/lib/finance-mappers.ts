@@ -21,8 +21,9 @@ import type {
 import type { Account, Asset, Bill, Expense, Goal, Income, Liability } from "@/types/finance";
 
 /* ---------------- dates ---------------- */
-
-export const todayISODate = () => new Date().toISOString().slice(0, 10);
+// All dates are Indian calendar dates (Asia/Kolkata) — see src/lib/date-in.ts.
+export { todayISO as todayISODate } from "@/lib/date-in";
+import { todayISO as todayISODateFn } from "@/lib/date-in";
 
 /** "2026-08-06" -> "06/08/2026" */
 export const isoToDMY = (iso: string | null | undefined) => {
@@ -33,10 +34,10 @@ export const isoToDMY = (iso: string | null | undefined) => {
 
 /** "06/08/2026" (or an ISO string) -> "2026-08-06" */
 export const dmyToISO = (value: string | null | undefined) => {
-  if (!value) return todayISODate();
+  if (!value) return todayISODateFn();
   if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
   const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return todayISODate();
+  if (!m) return todayISODateFn();
   return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 };
 
@@ -177,7 +178,7 @@ export const toLiability = (l: LiabilityRow): Liability => ({
   balance: Number(l.outstanding_balance),
   rate: Number(l.interest_rate),
   emi: Number(l.emi_amount),
-  due: l.next_due_date ?? todayISODate(),
+  due: l.next_due_date ?? todayISODateFn(),
   remaining: l.remaining_months ?? 0,
   status: l.status === "active" ? "Active" : l.status,
 });
@@ -188,7 +189,7 @@ export const toGoal = (g: GoalRow): Goal => ({
   icon: GOAL_ICON_MAP[g.icon ?? ""] ?? PiggyBank,
   target: Number(g.target_amount),
   current: Number(g.saved_amount),
-  date: g.target_date ?? todayISODate(),
+  date: g.target_date ?? todayISODateFn(),
 });
 
 export const toBill = (b: BillRow): Bill => ({
