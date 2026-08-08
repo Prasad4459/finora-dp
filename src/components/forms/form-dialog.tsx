@@ -12,19 +12,31 @@ import { Textarea } from "@/components/ui/textarea";
  * instrument-aware forms (an FD asks for a rate, a mutual fund asks for units).
  * Hidden fields are never submitted and never block submission.
  */
-type Common = { showWhen?: (values: Record<string, string | boolean>) => boolean; hint?: string };
+type Common = {
+  showWhen?: (values: Record<string, string | boolean>) => boolean;
+  hint?: string;
+  /** Shown under the field when it is required but empty on submit. */
+  requiredMessage?: string;
+};
+
+/** A select option may carry a UUID value plus a rich display label. */
+export type SelectOption = { value: string; label: string; hint?: string };
+
+const normalizeOptions = (options: readonly (string | SelectOption)[]): SelectOption[] =>
+  options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
 
 export type FieldDef =
   | ({ key: string; label: string; type: "text" | "number" | "date"; required?: boolean; placeholder?: string; default?: string } & Common)
-  | ({ key: string; label: string; type: "select"; options: readonly string[] | string[]; required?: boolean; default?: string; placeholder?: string } & Common)
+  | ({ key: string; label: string; type: "select"; options: readonly (string | SelectOption)[]; required?: boolean; default?: string; placeholder?: string } & Common)
   | ({ key: string; label: string; type: "switch"; default?: string; required?: boolean; placeholder?: string } & Common)
   | ({ key: string; label: string; type: "textarea"; required?: boolean; placeholder?: string; default?: string } & Common);
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, children, error }: { label: string; children: ReactNode; error?: string | null }) {
   return (
     <div className="grid gap-1.5">
       <Label className="text-xs">{label}</Label>
       {children}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }
@@ -56,26 +68,36 @@ export function FormDialog({
     return { ...o, ...(initialValues ?? {}) };
   }, [fields, initialValues]);
   const [values, setValues] = useState<Record<string, string | boolean>>(initial);
+  const [showErrors, setShowErrors] = useState(false);
 
   const [lastOpen, setLastOpen] = useState(open);
   if (lastOpen !== open) {
     setLastOpen(open);
-    if (open) setValues(initial);
+    if (open) {
+      setValues(initial);
+      setShowErrors(false);
+    }
   }
 
   const set = (k: string, v: string | boolean) => setValues((s) => ({ ...s, [k]: v }));
 
   const visible = fields.filter((f) => (f.showWhen ? f.showWhen(values) : true));
 
-  const canSubmit = visible.every((f) => {
-    if (!f.required) return true;
+  const isMissing = (f: FieldDef) => {
+    if (!f.required) return false;
     const v = values[f.key];
-    return typeof v === "string" ? v.trim().length > 0 : true;
-  });
+    return typeof v === "string" ? v.trim().length === 0 : false;
+  };
+
+  const canSubmit = visible.every((f) => !isMissing(f));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      // Never submit a partially-filled financial form; surface what is missing.
+      setShowErrors(true);
+      return;
+    }
     // Hidden fields must not leak stale values into the payload.
     const visibleKeys = new Set(visible.map((f) => f.key));
     const payload: Record<string, string | boolean> = {};
@@ -94,16 +116,25 @@ export function FormDialog({
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
           {visible.map((f) => (
-            <Field key={f.key} label={f.label}>
+            <Field
+              key={f.key}
+              label={f.label}
+              error={showErrors && isMissing(f) ? (f.requiredMessage ?? `${f.label} is required`) : null}
+            >
               {f.type === "select" ? (
                 <Select value={String(values[f.key] ?? "")} onValueChange={(v) => set(f.key, v)}>
                   <SelectTrigger>
                     <SelectValue placeholder={f.placeholder ?? "Select..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    {f.options.map((o) => (
-                      <SelectItem key={o} value={o}>
-                        {o}
+                    {normalizeOptions(f.options).map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        <span className="flex w-full items-center justify-between gap-3">
+                          <span>{o.label}</span>
+                          {o.hint ? (
+                            <span className="text-xs text-muted-foreground">{o.hint}</span>
+                          ) : null}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -130,7 +161,7 @@ export function FormDialog({
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
+            <Button type="submit">
               {submitLabel}
             </Button>
           </DialogFooter>
