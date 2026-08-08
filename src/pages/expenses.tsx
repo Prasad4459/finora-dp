@@ -8,31 +8,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
+import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
 
-
-const catBreakdown = [
-  { name: "Rent", value: 18000, color: "var(--chart-1)" },
-  { name: "Groceries", value: 8500, color: "var(--chart-2)" },
-  { name: "Food", value: 5600, color: "var(--chart-3)" },
-  { name: "Fuel", value: 4200, color: "var(--chart-4)" },
-  { name: "EMI", value: 6500, color: "var(--chart-5)" },
-  { name: "Others", value: 2500, color: "var(--muted-foreground)" },
-];
-
-const trend = [
-  { month: "Feb", value: 44000 },
-  { month: "Mar", value: 47000 },
-  { month: "Apr", value: 42000 },
-  { month: "May", value: 51000 },
-  { month: "Jun", value: 48000 },
-  { month: "Jul", value: 42500 },
-];
+const CHART_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--muted-foreground)"];
+const TREND_MONTHS = 6;
 
 export function Expenses() {
-  const { expenses, openDialog, openEditDialog, removeExpense, totals, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  const { expenses, openDialog, openEditDialog, removeExpense, totals, summary, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  // Server-side aggregates only — the table below is paginated and can never
+  // be used to compute a total.
   const monthTotal = totals.monthExpenses;
-  const ytd = expenses.reduce((s, e) => s + e.amount, 0);
-  const avg = Math.round(ytd / trend.length);
+  const previous = summary.metricsFor(addMonths(summary.current, -1)).consumptionExpense;
+  const ytd = summary.ytd().consumptionExpense;
+  const avg = Math.round(ytd / Math.max(1, summary.current.month));
+  const today = todayISO();
+  const todayTotal = expenses.filter((e) => e.date === today).reduce((s, e) => s + e.amount, 0);
+  const trend = summary.series(TREND_MONTHS).map(({ ref, metrics }) => ({
+    month: monthShortLabel(ref),
+    value: metrics.consumptionExpense,
+  }));
+  const catBreakdown = summary.categorySpend(summary.current).slice(0, 6).map((c, i) => ({
+    name: c.name,
+    value: c.net,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
@@ -46,10 +45,10 @@ export function Expenses() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today" value={formatINR(0)} icon={Calendar} />
-        <StatCard label="This month" value={formatINR(monthTotal)} tone="negative" icon={ArrowUpCircle} />
+        <StatCard label="Today" value={formatINR(todayTotal)} icon={Calendar} />
+        <StatCard label="This month" value={formatINR(monthTotal)} delta={`Last month ${formatINR(previous)}`} tone="negative" icon={ArrowUpCircle} />
         <StatCard label="Year to date" value={formatINR(ytd)} tone="negative" icon={ArrowUpCircle} />
-        <StatCard label="Avg / month" value={formatINR(avg)} icon={TrendingDown} />
+        <StatCard label="Avg / month" value={formatINR(avg)} delta={`Across ${summary.current.month} months`} icon={TrendingDown} />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -73,6 +72,9 @@ export function Expenses() {
           <CardHeader><CardTitle className="text-base font-semibold">By category</CardTitle></CardHeader>
           <CardContent>
             <div className="h-[200px]">
+              {catBreakdown.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No spending this month yet.</div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={catBreakdown} dataKey="value" innerRadius={55} outerRadius={85} paddingAngle={2} stroke="var(--card)" strokeWidth={2}>
@@ -81,6 +83,7 @@ export function Expenses() {
                   <Tooltip formatter={(v: number) => formatINR(v)} />
                 </PieChart>
               </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
