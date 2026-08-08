@@ -182,14 +182,35 @@ export const toExpense = (t: Transaction, categoryName: string, walletName: stri
   amount: Number(t.amount),
 });
 
-export const toAsset = (a: AssetRow): Asset => ({
-  id: a.id,
-  name: a.name,
-  type: ASSET_LABEL_BY_TYPE[a.type] ?? "Other",
-  purchase: Number(a.purchase_value),
-  current: Number(a.current_value),
-  date: a.purchase_date ?? a.created_at.slice(0, 10),
-});
+export const toAsset = (a: AssetRow): Asset => {
+  // Generated types may lag behind the investment migration.
+  const x = a as AssetRow & {
+    units?: number | null;
+    avg_cost?: number | null;
+    last_price?: number | null;
+    interest_rate?: number | null;
+    compounding?: string | null;
+    maturity_date?: string | null;
+    folio_number?: string | null;
+  };
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return {
+    id: a.id,
+    name: a.name,
+    type: ASSET_LABEL_BY_TYPE[a.type] ?? "Other",
+    purchase: Number(a.purchase_value),
+    current: Number(a.current_value),
+    date: a.purchase_date ?? a.created_at.slice(0, 10),
+    units: num(x.units ?? a.quantity),
+    avgCost: num(x.avg_cost),
+    lastPrice: num(x.last_price),
+    rate: num(x.interest_rate),
+    compounding: x.compounding ?? null,
+    maturityDate: x.maturity_date ?? null,
+    folio: x.folio_number ?? null,
+    institution: a.institution ?? null,
+  };
+};
 
 export const toLiability = (l: LiabilityRow): Liability => ({
   id: l.id,
