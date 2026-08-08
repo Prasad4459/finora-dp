@@ -1,8 +1,10 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { EntityDialogs } from "@/components/forms/entity-dialogs";
 import { categoriesRepo } from "@/repositories";
 import { financeKeys } from "@/hooks/query-keys";
+import { errorMessage } from "@/hooks/use-entity-mutation";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
 import { useTransactions } from "@/hooks/use-transactions";
@@ -12,7 +14,8 @@ import { useGoals } from "@/hooks/use-goals";
 import { useBudgets } from "@/hooks/use-budgets";
 import { useBills } from "@/hooks/use-bills";
 import { useNotifications } from "@/hooks/use-notifications";
-import { currentMonthKey, isInMonth } from "@/services/finance";
+import { computeTotals, currentMonthKey, isInMonth, type FinanceTotals } from "@/services/finance";
+import { toTransactionView, type TransactionView } from "@/lib/transaction-view";
 import {
   assetTypeFromLabel,
   dmyToISO,
@@ -27,7 +30,7 @@ import {
   todayISODate,
   walletTypeFromLabel,
 } from "@/lib/finance-mappers";
-import type { Category, CategoryKind, Notification, Wallet } from "@/types/database";
+import type { Category, CategoryKind, Notification, TransactionInsert, Wallet } from "@/types/database";
 import type {
   Account,
   Asset,
@@ -49,6 +52,19 @@ export type GoalInput = { name: string; iconKey: string; target: number; current
 export type BudgetInput = { name: string; budget: number; spent?: number };
 export type BillInput = { name: string; category: string; due: string; amount: number; iconKey: string };
 
+export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
+export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
+export type DividendInput = { source: string; account: string; amount: number; date: string };
+export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
+export type EmiInput = {
+  liability: string;
+  account: string;
+  amount: number;
+  principal: number;
+  interest: number;
+  date: string;
+};
+
 /** Entity currently being edited; drives pre-populated dialogs. */
 export type EditTarget =
   | { kind: "account"; entity: Account }
@@ -62,9 +78,21 @@ export type EditTarget =
 
 type Ctx = {
   loading: boolean;
+  totals: FinanceTotals;
+  /** Unified ledger — every supported transaction type, newest first. */
+  transactions: TransactionView[];
+  hasMoreTransactions: boolean;
+  isLoadingMoreTransactions: boolean;
+  loadMoreTransactions: () => void;
+  removeTransaction: (id: string) => void;
   accounts: Account[]; addAccount: (v: AccountInput) => void; updateAccount: (id: string, v: AccountInput) => void; removeAccount: (id: string) => void;
   incomes: Income[]; addIncome: (v: IncomeInput) => void; updateIncome: (id: string, v: IncomeInput) => void; removeIncome: (id: string) => void;
   expenses: Expense[]; addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
+  addTransfer: (v: TransferInput) => void;
+  addInvestment: (v: InvestmentInput) => void;
+  addDividend: (v: DividendInput) => void;
+  addRefund: (v: RefundInput) => void;
+  addEmiPayment: (v: EmiInput) => void;
   assets: Asset[]; addAsset: (v: AssetInput) => void; updateAsset: (id: string, v: AssetInput) => void; removeAsset: (id: string) => void;
   liabilities: Liability[]; addLiability: (v: LiabilityInput) => void; updateLiability: (id: string, v: LiabilityInput) => void; removeLiability: (id: string) => void;
   goals: Goal[]; addGoal: (v: GoalInput) => void; updateGoal: (id: string, v: GoalInput) => void; removeGoal: (id: string) => void;
@@ -110,19 +138,48 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const categoryName = (id: string | null) => categoryRows.find((c) => c.id === id)?.name ?? "Others";
 
   const accounts = useMemo(() => walletRows.map(toAccount), [walletRows]);
+
+  /** Single source of truth for financial activity in the UI. */
+  const ledger = useMemo(
+    () => txRows.map((t) => toTransactionView(t, { categoryName, walletName })),
+    [txRows, categoryRows, walletRows],
+  );
+
+  // Income-side history: income, dividends and refunds are all inflows.
   const incomes = useMemo(
-    () => txRows.filter((t) => t.type === "income").map((t) => toIncome(t, categoryName(t.category_id), walletName(t.wallet_id))),
+    () =>
+      txRows
+        .filter((t) => t.type === "income" || t.type === "dividend" || t.type === "refund")
+        .map((t) => {
+          const row = toIncome(t, categoryName(t.category_id), walletName(t.wallet_id));
+          return t.type === "income" ? row : { ...row, category: t.type === "dividend" ? "Dividend" : "Refund" };
+        }),
     [txRows, categoryRows, walletRows],
   );
+
+  // Outflow-side history: expenses, EMI payments and investment purchases all
+  // leave a wallet, so none of them may disappear from the list.
   const expenses = useMemo(
-    () => txRows.filter((t) => t.type === "expense").map((t) => toExpense(t, categoryName(t.category_id), walletName(t.wallet_id))),
+    () =>
+      txRows
+        .filter((t) => t.type === "expense" || t.type === "emi" || t.type === "investment")
+        .map((t) => {
+          const row = toExpense(t, categoryName(t.category_id), walletName(t.wallet_id));
+          return t.type === "expense" ? row : { ...row, category: t.type === "emi" ? "EMI" : "Investment" };
+        }),
     [txRows, categoryRows, walletRows],
   );
+
   const assets = useMemo(() => assetsData.rows.map(toAsset), [assetsData.rows]);
   const liabilities = useMemo(() => liabilitiesData.rows.map(toLiability), [liabilitiesData.rows]);
   const goals = useMemo(() => goalsData.rows.map(toGoal), [goalsData.rows]);
   const bills = useMemo(() => billsData.rows.map(toBill), [billsData.rows]);
   const notifications = useMemo(() => notificationsData.rows, [notificationsData.rows]);
+
+  const totals = useMemo(
+    () => computeTotals({ accounts, assets, liabilities, transactions: ledger }),
+    [accounts, assets, liabilities, ledger],
+  );
 
   // Budgets: the limit comes from the budgets table; "spent" is derived from this
   // month's expense transactions matched on category id (name only as fallback).
@@ -130,34 +187,45 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const monthKey = currentMonthKey();
     return budgetsData.rows.map((b) => {
       const name = b.name ?? categoryName(b.category_id);
-      const spent = txRows
-        .filter((t) => t.type === "expense" && isInMonth(t.transaction_date, monthKey))
-        .filter((t) =>
-          b.category_id
-            ? t.category_id === b.category_id
-            : categoryName(t.category_id).toLowerCase() === name.toLowerCase(),
-        )
-        .reduce((s, t) => s + Number(t.amount), 0);
-      return { id: b.id, name, budget: Number(b.amount), spent, categoryId: b.category_id };
+      const spent = ledger
+        .filter((t) => t.type === "expense" && isInMonth(t.date, monthKey))
+        .filter((t) => (b.category_id ? t.categoryId === b.category_id : t.category.toLowerCase() === name.toLowerCase()))
+        .reduce((s, t) => s + t.amount, 0);
+      const refunded = ledger
+        .filter((t) => t.type === "refund" && isInMonth(t.date, monthKey))
+        .filter((t) => (b.category_id ? t.categoryId === b.category_id : t.category.toLowerCase() === name.toLowerCase()))
+        .reduce((s, t) => s + t.amount, 0);
+      return { id: b.id, name, budget: Number(b.amount), spent: Math.max(0, spent - refunded), categoryId: b.category_id };
     });
-  }, [budgetsData.rows, txRows, categoryRows]);
+  }, [budgetsData.rows, ledger, categoryRows]);
 
   /** Finds a category by name (creating it when missing) so records stay linked. */
   const resolveCategoryId = async (name: string, kind: CategoryKind): Promise<string | null> => {
     if (!name) return null;
-    const existing = categoryRows.find(
+    const cached = categoryRows.find(
       (c) => c.name.toLowerCase() === name.toLowerCase() && (c.kind === kind || c.kind === "both"),
     );
-    if (existing) return existing.id;
-    const created = await categoriesRepo.create({ name, kind });
-    qc.invalidateQueries({ queryKey: financeKeys.categories });
-    return created.id;
+    if (cached) return cached.id;
+    const category = await categoriesRepo.ensure(name, kind);
+    await qc.invalidateQueries({ queryKey: financeKeys.categories });
+    return category.id;
   };
 
   const resolveWalletId = (name?: string): string | null => {
     if (!name || name === "—") return null;
     const w = walletRows.find((x) => x.name.toLowerCase() === name.toLowerCase());
     return w?.id ?? null;
+  };
+
+  const requireWalletId = (name: string, label: string): string => {
+    const id = resolveWalletId(name);
+    if (!id) throw new Error(`${label} account "${name}" was not found`);
+    return id;
+  };
+
+  /** Runs an async payload builder and surfaces failures instead of swallowing them. */
+  const run = (build: () => Promise<void>) => {
+    void build().catch((e) => toast.error(errorMessage(e)));
   };
 
   /* ---------- UI input -> database payload mappers ---------- */
@@ -223,6 +291,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     notes: v.category,
   });
 
+  const createTx = (values: Omit<TransactionInsert, "user_id">) => transactions.create.mutate(values);
+
   const saveBudget = async (v: BudgetInput, id?: string) => {
     const existing = id
       ? budgetsData.rows.find((b) => b.id === id)
@@ -244,19 +314,106 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const value: Ctx = {
     loading,
+    totals,
+    transactions: ledger,
+    hasMoreTransactions: transactions.hasMore,
+    isLoadingMoreTransactions: transactions.isLoadingMore,
+    loadMoreTransactions: () => transactions.loadMore(),
+    removeTransaction: (id) => transactions.remove.mutate(id),
     accounts, incomes, expenses, assets, liabilities, goals, budgets, bills, notifications,
 
     addAccount: (v) => wallets.create.mutate(walletPayload(v)),
     updateAccount: (id, v) => wallets.update.mutate({ id, values: walletPayload(v) }),
     removeAccount: (id) => wallets.remove.mutate(id),
 
-    addIncome: (v) => void incomePayload(v).then((values) => transactions.create.mutate(values)),
-    updateIncome: (id, v) => void incomePayload(v).then((values) => transactions.update.mutate({ id, values })),
+    addIncome: (v) => run(async () => createTx(await incomePayload(v))),
+    updateIncome: (id, v) => run(async () => transactions.update.mutate({ id, values: await incomePayload(v) })),
     removeIncome: (id) => transactions.remove.mutate(id),
 
-    addExpense: (v) => void expensePayload(v).then((values) => transactions.create.mutate(values)),
-    updateExpense: (id, v) => void expensePayload(v).then((values) => transactions.update.mutate({ id, values })),
+    addExpense: (v) => run(async () => createTx(await expensePayload(v))),
+    updateExpense: (id, v) => run(async () => transactions.update.mutate({ id, values: await expensePayload(v) })),
     removeExpense: (id) => transactions.remove.mutate(id),
+
+    // Transfer: one row, both legs. Never counted as income or expense.
+    addTransfer: (v) =>
+      run(async () => {
+        const from = requireWalletId(v.from, "Source");
+        const to = requireWalletId(v.to, "Destination");
+        if (from === to) throw new Error("Source and destination must be different accounts");
+        createTx({
+          type: "transfer",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: from,
+          to_wallet_id: to,
+          payee: v.to,
+          notes: v.notes || null,
+        });
+      }),
+
+    // Investment: cash leaves the wallet and lands in an existing asset.
+    addInvestment: (v) =>
+      run(async () => {
+        const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
+        if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        createTx({
+          type: "investment",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: requireWalletId(v.account, "Source"),
+          asset_id: asset.id,
+          payee: v.asset,
+          category_id: await resolveCategoryId("Investment", "expense"),
+          notes: v.notes || null,
+        } as Omit<TransactionInsert, "user_id">);
+      }),
+
+    addDividend: (v) =>
+      run(async () =>
+        createTx({
+          type: "dividend",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: requireWalletId(v.account, "Destination"),
+          payee: v.source,
+          category_id: await resolveCategoryId("Dividend", "income"),
+        }),
+      ),
+
+    addRefund: (v) =>
+      run(async () =>
+        createTx({
+          type: "refund",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: requireWalletId(v.account, "Destination"),
+          payee: v.merchant,
+          category_id: await resolveCategoryId(v.category || "Refund", "expense"),
+        }),
+      ),
+
+    // EMI: wallet -amount, liability -principal, interest recognised as expense.
+    addEmiPayment: (v) =>
+      run(async () => {
+        const liability = liabilitiesData.rows.find((l) => l.name.toLowerCase() === v.liability.toLowerCase());
+        if (!liability) throw new Error(`Liability "${v.liability}" was not found`);
+        const interest = Number(v.interest || 0);
+        const principal = Number(v.principal || Math.max(0, v.amount - interest));
+        if (principal + interest > v.amount + 0.5) {
+          throw new Error("Principal + interest cannot exceed the EMI amount");
+        }
+        createTx({
+          type: "emi",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: requireWalletId(v.account, "Source"),
+          liability_id: liability.id,
+          principal_amount: principal,
+          interest_amount: interest,
+          payee: v.liability,
+          category_id: await resolveCategoryId("EMI", "expense"),
+        } as Omit<TransactionInsert, "user_id">);
+      }),
 
     addAsset: (v) => assetsData.create.mutate(assetPayload(v)),
     updateAsset: (id, v) => assetsData.update.mutate({ id, values: assetPayload(v) }),
@@ -270,8 +427,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     updateGoal: (id, v) => goalsData.update.mutate({ id, values: goalPayload(v) }),
     removeGoal: (id) => goalsData.remove.mutate(id),
 
-    addBudget: (v) => void saveBudget(v),
-    updateBudget: (id, v) => void saveBudget(v, id),
+    addBudget: (v) => run(() => saveBudget(v)),
+    updateBudget: (id, v) => run(() => saveBudget(v, id)),
     removeBudget: (id) => budgetsData.remove.mutate(id),
 
     addBill: (v) => billsData.create.mutate(billPayload(v)),
