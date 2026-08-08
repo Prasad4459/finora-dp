@@ -409,7 +409,7 @@ function CashFlowCard() {
           <WidgetEmpty message="No income or expenses recorded yet." />
         ) : (
           <>
-            <div className="h-[260px] w-full">
+            <div className="h-[260px] w-full min-w-0 overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={data} barGap={6}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -464,7 +464,7 @@ function SpendingCard() {
           <WidgetEmpty message="No spending recorded this month." />
         ) : (
           <>
-            <div className="relative h-[190px] w-full">
+            <div className="relative h-[190px] w-full min-w-0 overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -569,7 +569,7 @@ function NetWorthCard() {
         ) : !hasHistory ? (
           <WidgetEmpty message="Add an account or a transaction to start tracking net worth." />
         ) : (
-          <div className="h-[250px] w-full">
+          <div className="h-[250px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                 <defs>
