@@ -56,6 +56,10 @@ export function EntityDialogs({
   onClose: () => void;
 }) {
   const f = useFinance();
+  const accountNames = f.accounts.map((a) => a.name);
+  const assetNames = f.assets.map((a) => a.name);
+  const liabilityNames = f.liabilities.map((l) => l.name);
+  const goalNames = f.goals.map((g) => g.name);
   const today = todayISO();
   const initial = initialFor(editing);
   const editId = editing?.entity.id ?? null;
@@ -127,6 +131,53 @@ export function EntityDialogs({
     { key: "iconKey", label: "Icon", type: "select", options: BILL_ICON_KEYS as unknown as string[], default: "Receipt" },
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
     { key: "due", label: "Due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true },
+  ];
+
+  const transferFields: FieldDef[] = [
+    { key: "from", label: "From account", type: "select", options: accountNames, required: true },
+    { key: "to", label: "To account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
+  ];
+
+  const investmentFields: FieldDef[] = [
+    { key: "asset", label: "Invest into (asset)", type: "select", options: assetNames, required: true },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
+  ];
+
+  const dividendFields: FieldDef[] = [
+    { key: "source", label: "Source", type: "text", required: true, placeholder: "e.g. TCS Dividend" },
+    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
+  const refundFields: FieldDef[] = [
+    { key: "merchant", label: "Refunded by", type: "text", required: true },
+    { key: "category", label: "Original category", type: "select", options: EXPENSE_CATEGORIES as unknown as string[] },
+    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
+  const emiFields: FieldDef[] = [
+    { key: "liability", label: "Loan / liability", type: "select", options: liabilityNames, required: true },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "EMI amount (₹)", type: "number", required: true },
+    { key: "principal", label: "Principal portion (₹)", type: "number" },
+    { key: "interest", label: "Interest portion (₹)", type: "number" },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
+  const contributionFields: FieldDef[] = [
+    { key: "goal", label: "Goal", type: "select", options: goalNames, required: true },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
   ];
 
   return (
