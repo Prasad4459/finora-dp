@@ -418,9 +418,12 @@ function DashboardInner() {
           <p className="text-sm text-muted-foreground">Where most of your money went this month</p>
         </CardHeader>
         <CardContent className="space-y-3">
+          {expenseBreakdown.length === 0 && (
+            <p className="text-sm text-muted-foreground">No spending recorded this month.</p>
+          )}
           {expenseBreakdown.slice(0, 5).map((c) => {
             const total = expenseBreakdown.reduce((s, x) => s + x.value, 0);
-            const pct = Math.round((c.value / total) * 100);
+            const pct = percentOf(c.value, total);
             return (
               <div key={c.name}>
                 <div className="mb-1 flex items-center justify-between text-sm">
@@ -506,8 +509,11 @@ function DashboardInner() {
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
+              {upcomingBills.length === 0 && (
+                <li className="px-5 py-6 text-sm text-muted-foreground">No bills scheduled.</li>
+              )}
               {upcomingBills.map((b) => {
-                const Icon = b.icon;
+                const Icon = b.icon ?? Receipt;
                 return (
                   <li key={b.id} className="flex items-center gap-3 px-5 py-3">
                     <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
@@ -516,7 +522,7 @@ function DashboardInner() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{b.name}</div>
                       <Badge variant="secondary" className="mt-0.5 h-5 px-1.5 text-[10px] font-normal">
-                        Due {b.due}
+                        Due {formatDateIN(b.due)}
                       </Badge>
                     </div>
                     <div className="text-sm font-semibold tabular-nums">{currencyExact(b.amount)}</div>
