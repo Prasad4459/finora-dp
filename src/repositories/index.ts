@@ -8,4 +8,6 @@ export { goalsRepo } from "./goals.repo";
 export { budgetsRepo } from "./budgets.repo";
 export { billsRepo } from "./bills.repo";
 export { notificationsRepo } from "./notifications.repo";
+export { analyticsRepo } from "./analytics.repo";
+export type { MonthlySummaryRow, CategoryMonthlyRow } from "./analytics.repo";
 export { profilesRepo, userSettingsRepo } from "./profiles.repo";
