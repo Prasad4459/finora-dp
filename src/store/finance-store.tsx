@@ -132,9 +132,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const billsData = useBills();
   const notificationsData = useNotifications();
 
+  // Every budget must be able to show ITS OWN period, so the aggregate window
+  // is widened to cover all stored budget periods.
+  const budgetPeriods = useMemo<MonthRef[]>(
+    () => budgetsData.rows.map((b) => ({ year: b.period_year, month: b.period_month })),
+    [budgetsData.rows],
+  );
+  const summary = useFinanceSummary({ extraMonths: budgetPeriods, trailingMonths: 12 });
+
   const loading =
     wallets.isLoading || categories.isLoading || transactions.isLoading || assetsData.isLoading ||
-    liabilitiesData.isLoading || goalsData.isLoading || budgetsData.isLoading || billsData.isLoading;
+    liabilitiesData.isLoading || goalsData.isLoading || budgetsData.isLoading || billsData.isLoading ||
+    summary.isLoading;
 
   const walletRows = useMemo<Wallet[]>(() => wallets.rows, [wallets.rows]);
   const categoryRows = useMemo<Category[]>(() => categories.rows, [categories.rows]);
@@ -182,28 +191,44 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const bills = useMemo(() => billsData.rows.map(toBill), [billsData.rows]);
   const notifications = useMemo(() => notificationsData.rows, [notificationsData.rows]);
 
+  // Totals always describe the CURRENT IST month and come from the server-side
+  // aggregate, never from the paginated transaction list.
   const totals = useMemo(
-    () => computeTotals({ accounts, assets, liabilities, transactions: ledger }),
-    [accounts, assets, liabilities, ledger],
+    () => computeTotals({ accounts, assets, liabilities, month: summary.metricsFor(summary.current) }),
+    [accounts, assets, liabilities, summary.categoryRows, summary.isLoading, summary.current.year, summary.current.month],
   );
 
-  // Budgets: the limit comes from the budgets table; "spent" is derived from this
-  // month's expense transactions matched on category id (name only as fallback).
-  const budgets = useMemo<Budget[]>(() => {
-    const monthKey = currentMonthKey();
-    return budgetsData.rows.map((b) => {
-      const name = b.name ?? categoryName(b.category_id);
-      const spent = ledger
-        .filter((t) => t.type === "expense" && isInMonth(t.date, monthKey))
-        .filter((t) => (b.category_id ? t.categoryId === b.category_id : t.category.toLowerCase() === name.toLowerCase()))
-        .reduce((s, t) => s + t.amount, 0);
-      const refunded = ledger
-        .filter((t) => t.type === "refund" && isInMonth(t.date, monthKey))
-        .filter((t) => (b.category_id ? t.categoryId === b.category_id : t.category.toLowerCase() === name.toLowerCase()))
-        .reduce((s, t) => s + t.amount, 0);
-      return { id: b.id, name, budget: Number(b.amount), spent: Math.max(0, spent - refunded), categoryId: b.category_id };
-    });
-  }, [budgetsData.rows, ledger, categoryRows]);
+  // Budgets: the limit comes from the budgets table; "spent" is aggregated by
+  // Postgres for the budget's OWN period_year / period_month — never for the
+  // current month.
+  const budgets = useMemo<Budget[]>(
+    () =>
+      budgetsData.rows.map((b) => {
+        const name = b.name ?? categoryName(b.category_id);
+        const period: MonthRef = { year: b.period_year, month: b.period_month };
+        const rows = summary.categoryRows.filter(
+          (r) =>
+            Number(r.y) === period.year &&
+            Number(r.m) === period.month &&
+            (b.category_id
+              ? r.category_id === b.category_id
+              : (r.category_name ?? "").toLowerCase() === name.toLowerCase()),
+        );
+        const spent = rows.filter((r) => r.tx_type === "expense").reduce((s, r) => s + Number(r.total ?? 0), 0);
+        const refunded = rows.filter((r) => r.tx_type === "refund").reduce((s, r) => s + Number(r.total ?? 0), 0);
+        return {
+          id: b.id,
+          name,
+          budget: Number(b.amount),
+          spent: Math.max(0, spent - refunded),
+          categoryId: b.category_id,
+          periodYear: period.year,
+          periodMonth: period.month,
+          periodLabel: monthLongLabel(period),
+        };
+      }),
+    [budgetsData.rows, summary.categoryRows, categoryRows],
+  );
 
   /** Finds a category by name (creating it when missing) so records stay linked. */
   const resolveCategoryId = async (name: string, kind: CategoryKind): Promise<string | null> => {
