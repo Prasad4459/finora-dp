@@ -261,12 +261,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   /* ---------- UI input -> database payload mappers ---------- */
 
-  const walletPayload = (v: AccountInput) => ({
+  // WALLET BALANCE AUTHORITY
+  // A wallet's running balance is ledger-derived: opening_balance + every
+  // transaction effect applied by the database trigger. Only creation sets a
+  // balance (the opening balance); editing an account can never overwrite the
+  // calculated balance.
+  const walletCreatePayload = (v: AccountInput) => ({
     name: v.name,
     institution: v.bank,
     type: walletTypeFromLabel(v.type),
     icon: v.type,
+    opening_balance: v.balance,
     balance: v.balance,
+  });
+
+  const walletUpdatePayload = (v: AccountInput) => ({
+    name: v.name,
+    institution: v.bank,
+    type: walletTypeFromLabel(v.type),
+    icon: v.type,
   });
 
   const incomePayload = async (v: IncomeInput) => ({
@@ -346,6 +359,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const value: Ctx = {
     loading,
     totals,
+    summary,
     transactions: ledger,
     hasMoreTransactions: transactions.hasMore,
     isLoadingMoreTransactions: transactions.isLoadingMore,
@@ -353,8 +367,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     removeTransaction: (id) => transactions.remove.mutate(id),
     accounts, incomes, expenses, assets, liabilities, goals, budgets, bills, notifications,
 
-    addAccount: (v) => wallets.create.mutate(walletPayload(v)),
-    updateAccount: (id, v) => wallets.update.mutate({ id, values: walletPayload(v) }),
+    addAccount: (v) => wallets.create.mutate(walletCreatePayload(v)),
+    updateAccount: (id, v) => wallets.update.mutate({ id, values: walletUpdatePayload(v) }),
     removeAccount: (id) => wallets.remove.mutate(id),
 
     addIncome: (v) => run(async () => createTx(await incomePayload(v))),
@@ -446,17 +460,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         } as Omit<TransactionInsert, "user_id">);
       }),
 
-    // Goal contribution: money leaves a wallet and is linked to the goal, so the
-    // goal's saved amount is derived from a real transaction (and reversible).
+    // GOAL ACCOUNTING
+    // A goal is an *allocation label*, not a place money goes to. A
+    // contribution is therefore a real transfer between two real wallets
+    // (e.g. HDFC Savings -> Emergency Fund savings account) tagged with
+    // goal_id. The trigger debits the source, credits the destination and
+    // raises the goal's saved amount — so net worth is unchanged and editing
+    // or deleting the row reverses all three effects atomically.
     addGoalContribution: (v) =>
       run(async () => {
         const goal = goalsData.rows.find((g) => g.name.toLowerCase() === v.goal.toLowerCase());
         if (!goal) throw new Error(`Goal "${v.goal}" was not found`);
+        const from = requireWalletId(v.account, "Source");
+        const to = requireWalletId(v.to, "Destination");
+        if (from === to) throw new Error("Choose a different account to hold the goal money");
         createTx({
           type: "transfer",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Source"),
+          wallet_id: from,
+          to_wallet_id: to,
           goal_id: goal.id,
           payee: v.goal,
           notes: "Goal contribution",
