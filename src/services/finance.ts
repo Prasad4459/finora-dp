@@ -220,3 +220,12 @@ export const budgetProgress = (b: Budget) => ({
 });
 
 export const percentOf = (part: number, whole: number) => Math.round(safeDiv(part, whole) * 100);
+
+/**
+ * How much net worth a month created:
+ *   cash retained + capital invested + debt principal repaid.
+ * Used to reconstruct the historical net-worth curve backwards from today's
+ * authoritative balance (we never store net-worth snapshots).
+ */
+export const netWorthChange = (m: MonthMetrics) =>
+  m.savings + m.investmentContribution + m.emiPrincipal;
