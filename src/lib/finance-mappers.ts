@@ -72,6 +72,10 @@ const ASSET_TYPE_BY_LABEL: Record<string, AssetType> = {
   RD: "recurring_deposit",
   Gold: "gold",
   Silver: "silver",
+  "Digital Gold": "digital_gold",
+  "Gold ETF": "gold_etf",
+  "Gold Fund": "gold_fund",
+  "Sovereign Gold Bond": "sovereign_gold_bond",
   Stocks: "stocks",
   "Mutual Funds": "mutual_fund",
   ETF: "etf",
@@ -98,6 +102,10 @@ const ASSET_LABEL_BY_TYPE: Record<AssetType, string> = {
   recurring_deposit: "RD",
   gold: "Gold",
   silver: "Silver",
+  digital_gold: "Digital Gold",
+  gold_etf: "Gold ETF",
+  gold_fund: "Gold Fund",
+  sovereign_gold_bond: "Sovereign Gold Bond",
   stocks: "Stocks",
   mutual_fund: "Mutual Funds",
   etf: "ETF",
@@ -191,7 +199,9 @@ export const toAsset = (a: AssetRow): Asset => {
     interest_rate?: number | null;
     compounding?: string | null;
     maturity_date?: string | null;
+    maturity_value?: number | null;
     folio_number?: string | null;
+    is_active?: boolean | null;
   };
   const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return {
@@ -207,8 +217,10 @@ export const toAsset = (a: AssetRow): Asset => {
     rate: num(x.interest_rate),
     compounding: x.compounding ?? null,
     maturityDate: x.maturity_date ?? null,
+    maturityValue: num(x.maturity_value),
     folio: x.folio_number ?? null,
     institution: a.institution ?? null,
+    isActive: x.is_active ?? true,
   };
 };
 
