@@ -43,7 +43,7 @@ export function FormDialog({
   const initial = useMemo(() => {
     const o: Record<string, string | boolean> = {};
     fields.forEach((f) => {
-      if (f.type === "switch") o[f.key] = false;
+      if (f.type === "switch") o[f.key] = f.default === "true";
       else o[f.key] = f.default ?? "";
     });
     return { ...o, ...(initialValues ?? {}) };
