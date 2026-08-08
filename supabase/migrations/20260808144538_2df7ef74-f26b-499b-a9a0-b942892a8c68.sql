@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.bill_payments_bill_occurrence_uidx;
