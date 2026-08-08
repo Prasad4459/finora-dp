@@ -92,4 +92,5 @@ export type EntityKind =
   | "investment"
   | "dividend"
   | "refund"
-  | "emi";
+  | "emi"
+  | "contribution";

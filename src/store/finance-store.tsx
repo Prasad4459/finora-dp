@@ -56,6 +56,7 @@ export type TransferInput = { from: string; to: string; amount: number; date: st
 export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
 export type DividendInput = { source: string; account: string; amount: number; date: string };
 export type RefundInput = { merchant: string; category: string; account: string; amount: number; date: string };
+export type ContributionInput = { goal: string; account: string; amount: number; date: string };
 export type EmiInput = {
   liability: string;
   account: string;
@@ -93,6 +94,7 @@ type Ctx = {
   addDividend: (v: DividendInput) => void;
   addRefund: (v: RefundInput) => void;
   addEmiPayment: (v: EmiInput) => void;
+  addGoalContribution: (v: ContributionInput) => void;
   assets: Asset[]; addAsset: (v: AssetInput) => void; updateAsset: (id: string, v: AssetInput) => void; removeAsset: (id: string) => void;
   liabilities: Liability[]; addLiability: (v: LiabilityInput) => void; updateLiability: (id: string, v: LiabilityInput) => void; removeLiability: (id: string) => void;
   goals: Goal[]; addGoal: (v: GoalInput) => void; updateGoal: (id: string, v: GoalInput) => void; removeGoal: (id: string) => void;
@@ -412,6 +414,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           interest_amount: interest,
           payee: v.liability,
           category_id: await resolveCategoryId("EMI", "expense"),
+        } as Omit<TransactionInsert, "user_id">);
+      }),
+
+    // Goal contribution: money leaves a wallet and is linked to the goal, so the
+    // goal's saved amount is derived from a real transaction (and reversible).
+    addGoalContribution: (v) =>
+      run(async () => {
+        const goal = goalsData.rows.find((g) => g.name.toLowerCase() === v.goal.toLowerCase());
+        if (!goal) throw new Error(`Goal "${v.goal}" was not found`);
+        createTx({
+          type: "transfer",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: requireWalletId(v.account, "Source"),
+          goal_id: goal.id,
+          payee: v.goal,
+          notes: "Goal contribution",
         } as Omit<TransactionInsert, "user_id">);
       }),
 
