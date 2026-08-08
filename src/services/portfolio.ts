@@ -63,6 +63,7 @@ export function toHolding(a: Asset, todayISO: string): Holding {
       current: a.current,
       date: a.date,
       units: a.units,
+      avgCost: a.avgCost,
       lastPrice: a.lastPrice,
       rate: a.rate,
       compounding: a.compounding,
