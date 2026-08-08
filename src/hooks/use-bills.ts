@@ -3,7 +3,6 @@ import {
   billPaymentsRepo,
   billsRepo,
   notificationsRepo,
-  transactionsRepo,
 } from "@/repositories";
 import { BILL_PAYMENT_KEYS, CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
@@ -47,56 +46,20 @@ export async function payBill(input: PayBillInput) {
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Enter a valid amount");
   const dueISO = (bill.due_date ?? todayISO()).slice(0, 10);
   const periodKey = occurrenceKey(dueISO);
-
-  // CLAIM THE OCCURRENCE FIRST.
-  // The UNIQUE(bill_id, period_key) index is the only reliable duplicate guard
-  // (a read-then-write check races with double clicks and other tabs). The
-  // expense is created only once this insert has won, so a rejected duplicate
-  // can never leave a stray ledger row behind.
-  let claim;
-  try {
-    claim = await billPaymentsRepo.create({
-      bill_id: bill.id,
-      period_key: periodKey,
-      due_date: dueISO,
-      expected_amount: Number(bill.amount),
-      paid_amount: input.amount,
-      paid_date: input.paidDate,
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (/duplicate key|23505/i.test(message)) {
-      throw new Error("This bill occurrence is already marked as paid");
-    }
-    throw e;
-  }
-
-  let tx;
-  try {
-    tx = await transactionsRepo.create({
-      type: "expense",
-      amount: input.amount,
-      transaction_date: input.paidDate,
-      wallet_id: input.walletId,
-      category_id: bill.category_id,
-      payee: bill.name,
-      notes: input.notes || `Bill payment — ${bill.name}`,
-    });
-  } catch (e) {
-    // Release the claim so the occurrence stays payable.
-    await billPaymentsRepo.remove(claim.id).catch(() => undefined);
-    throw e;
-  }
-
-  await billPaymentsRepo.update(claim.id, { transaction_id: tx.id });
-
-  // Recurring bills roll forward to their next occurrence; the recurring
-  // definition stays the single source of truth (no future rows created).
   const next = bill.is_recurring ? nextDueDate(dueISO, bill.frequency as Frequency) : null;
-  await billsRepo.update(bill.id, {
-    last_paid_date: input.paidDate,
-    ...(next ? { due_date: next, status: "upcoming" as const } : { status: "paid" as const }),
+
+  // Claim + expense insert + wallet debit + bill roll-forward are one database
+  // transaction. A repeated or concurrent call for this exact date returns
+  // created=false before any ledger row is inserted.
+  const result = await billPaymentsRepo.payOccurrence({
+    billId: bill.id,
+    occurrenceDate: dueISO,
+    amount: input.amount,
+    walletId: input.walletId,
+    paidDate: input.paidDate,
+    nextDueDate: next,
   });
+  if (!result.created) return result;
 
   await notificationsRepo
     .create({
@@ -108,7 +71,7 @@ export async function payBill(input: PayBillInput) {
     })
     .catch(() => undefined); // a duplicate notification must never fail a payment
 
-  return tx;
+  return result;
 }
 
 export function useBillPayments() {
