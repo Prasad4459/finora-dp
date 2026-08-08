@@ -847,6 +847,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      pay_bill_occurrence: {
+        Args: {
+          _amount: number
+          _bill_id: string
+          _next_due_date?: string
+          _paid_date: string
+          _wallet_id: string
+        }
+        Returns: {
+          created: boolean
+          transaction_id: string
+        }[]
+      }
       tx_apply: {
         Args: {
           _sign: number
