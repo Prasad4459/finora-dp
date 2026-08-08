@@ -27,9 +27,11 @@ export function useLedger() {
         .filter((t) => t.type === "income" || t.type === "dividend" || t.type === "refund")
         .map((t) => {
           const row = toIncome(t, categoryName(t.category_id), walletName(t.wallet_id));
+          // txType is authoritative — no screen may infer meaning from the
+          // category NAME.
           return t.type === "income"
-            ? row
-            : { ...row, category: t.type === "dividend" ? "Dividend" : "Refund" };
+            ? { ...row, txType: t.type }
+            : { ...row, txType: t.type, category: t.type === "dividend" ? "Dividend" : row.category };
         }),
     [txRows, categoryRows, walletRows],
   );

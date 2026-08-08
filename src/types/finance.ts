@@ -17,6 +17,8 @@ export type Income = {
   source: string;
   category: string;
   account: string;
+  /** Authoritative ledger type ('income' | 'dividend' | 'refund'). */
+  txType?: string;
   /** Authoritative wallet UUID — never resolved by display name. */
   walletId: string | null;
   amount: number;
