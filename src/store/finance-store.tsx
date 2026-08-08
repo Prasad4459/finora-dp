@@ -16,6 +16,8 @@ import { useBills } from "@/hooks/use-bills";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
+import { frequencyFromLabel } from "@/services/bills";
+import { useBillReminders } from "@/hooks/use-bill-reminders";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import {
   assetTypeFromLabel,
@@ -51,7 +53,18 @@ export type AssetInput = Omit<Asset, "id">;
 export type LiabilityInput = Omit<Liability, "id" | "remaining" | "status">;
 export type GoalInput = { name: string; iconKey: string; target: number; current: number; date: string };
 export type BudgetInput = { name: string; budget: number; spent?: number };
-export type BillInput = { name: string; category: string; due: string; amount: number; iconKey: string };
+export type BillInput = {
+  name: string;
+  category: string;
+  due: string;
+  amount: number;
+  iconKey: string;
+  frequency?: string;
+  account?: string;
+  description?: string;
+  reminderEnabled?: boolean;
+  reminderDays?: number | string;
+};
 
 export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
 export type InvestmentInput = { asset: string; account: string; amount: number; date: string; notes?: string };
@@ -130,6 +143,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const budgetsData = useBudgets();
   const billsData = useBills();
   const notificationsData = useNotifications();
+
+  // In-app bill reminders (deduplicated per bill occurrence).
+  useBillReminders();
 
   // Every budget must be able to show ITS OWN period, so the aggregate window
   // is widened to cover all stored budget periods.
@@ -292,13 +308,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     target_date: v.date || todayISODate(),
   });
 
-  const billPayload = (v: BillInput) => ({
-    name: v.name,
-    amount: v.amount,
-    due_date: dmyToISO(v.due),
-    icon: v.iconKey,
-    notes: v.category,
-  });
+  const billPayload = async (v: BillInput) => {
+    const frequency = frequencyFromLabel(v.frequency ?? "Monthly");
+    const days = Number(v.reminderDays ?? 3);
+    return {
+      name: v.name,
+      amount: v.amount,
+      due_date: dmyToISO(v.due),
+      icon: v.iconKey,
+      // Category display name is kept in notes (existing behaviour) while the
+      // bill is also linked to the shared categories table.
+      notes: v.category,
+      category_id: await resolveCategoryId(v.category, "expense"),
+      wallet_id: resolveWalletId(v.account),
+      description: v.description || null,
+      frequency,
+      is_recurring: frequency !== "one_time",
+      reminder_enabled: v.reminderEnabled ?? true,
+      reminder_days_before: Number.isFinite(days) && days > 0 ? Math.round(days) : 3,
+    };
+  };
 
   const createTx = (values: Omit<TransactionInsert, "user_id">) => transactions.create.mutate(values);
 
@@ -464,8 +493,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     updateBudget: (id, v) => run(() => saveBudget(v, id)),
     removeBudget: (id) => budgetsData.remove.mutate(id),
 
-    addBill: (v) => billsData.create.mutate(billPayload(v)),
-    updateBill: (id, v) => billsData.update.mutate({ id, values: billPayload(v) }),
+    addBill: (v) => run(async () => billsData.create.mutate(await billPayload(v))),
+    updateBill: (id, v) => run(async () => billsData.update.mutate({ id, values: await billPayload(v) })),
     removeBill: (id) => billsData.remove.mutate(id),
 
     markNotificationRead: (id) => notificationsData.markRead.mutate(id),

@@ -29,6 +29,7 @@ export const financeKeys = {
   goals: ["goals"] as const,
   budgets: ["budgets"] as const,
   bills: ["bills"] as const,
+  billPayments: ["bill-payments"] as const,
   notifications: ["notifications"] as const,
   userSettings: ["user-settings"] as const,
   /** Dashboard-only 10-row window. Shares the "transactions" prefix so any
@@ -85,3 +86,17 @@ export function keysForTransaction(type?: TransactionType | null): readonly Quer
       return TRANSACTION_BASE_KEYS;
   }
 }
+
+/**
+ * Paying a bill writes ONE expense transaction through the engine plus the
+ * bill/payment rows, so exactly these caches can move — never "everything".
+ */
+export const BILL_PAYMENT_KEYS: readonly QueryKey[] = [
+  financeKeys.bills,
+  financeKeys.billPayments,
+  financeKeys.transactions,
+  financeKeys.wallets,
+  financeKeys.summary,
+  financeKeys.categorySummary,
+  financeKeys.notifications,
+];

@@ -78,10 +78,25 @@ export type Bill = {
   id: string;
   name: string;
   category: string;
+  /** Display date, DD/MM/YYYY. */
   due: string;
+  /** Occurrence due date, ISO "YYYY-MM-DD" (Asia/Kolkata calendar). */
+  dueISO: string;
   amount: number;
   icon: LucideIcon;
+  iconKey: string;
+  /** Raw stored status — the UI status is derived (see services/bills.ts). */
   status: string;
+  frequency: string;
+  isRecurring: boolean;
+  walletId: string | null;
+  /** Resolved wallet name, filled by the page that has the wallet list. */
+  accountName?: string;
+  categoryId: string | null;
+  description: string;
+  reminderEnabled: boolean;
+  reminderDays: number;
+  lastPaidDate: string | null;
 };
 
 export type EntityKind =

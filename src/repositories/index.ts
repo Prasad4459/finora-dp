@@ -7,6 +7,7 @@ export { liabilitiesRepo } from "./liabilities.repo";
 export { goalsRepo } from "./goals.repo";
 export { budgetsRepo } from "./budgets.repo";
 export { billsRepo } from "./bills.repo";
+export { billPaymentsRepo } from "./bill-payments.repo";
 export { notificationsRepo } from "./notifications.repo";
 export { analyticsRepo } from "./analytics.repo";
 export type { MonthlySummaryRow, CategoryMonthlyRow } from "./analytics.repo";
