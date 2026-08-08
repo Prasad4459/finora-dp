@@ -89,7 +89,8 @@ export function useBills() {
     success: "Bill added",
   });
   const update = useEntityMutation({
-    mutationFn: ({ id, values }: { id: string; values: BillUpdate }) => billsRepo.update(id, values),
+    mutationFn: ({ id, values }: { id: string; values: BillUpdate }) =>
+      billsRepo.update(id, values),
     invalidate: [financeKeys.bills],
     success: "Bill updated",
   });
