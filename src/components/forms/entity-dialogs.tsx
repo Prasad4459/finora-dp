@@ -62,6 +62,8 @@ function initialFor(editing: EditTarget | null): Values | null {
       return { name: str("name"), target: str("target"), current: str("current"), date: str("date") };
     case "budget":
       return { name: str("name"), budget: str("budget"), spent: str("spent") };
+    case "contribution":
+      return { goal: str("name") };
     case "bill":
       return {
         name: str("name"),
