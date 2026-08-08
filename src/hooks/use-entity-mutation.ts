@@ -12,14 +12,17 @@ export const errorMessage = (e: unknown) =>
  */
 export function useEntityMutation<TArgs, TResult>(options: {
   mutationFn: (args: TArgs) => Promise<TResult>;
-  invalidate: readonly QueryKey[];
+  /** Static key list, or a resolver that narrows keys from the mutation input. */
+  invalidate: readonly QueryKey[] | ((args: TArgs) => readonly QueryKey[]);
   success: string;
 }) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: options.mutationFn,
-    onSuccess: () => {
-      options.invalidate.forEach((queryKey) => qc.invalidateQueries({ queryKey }));
+    onSuccess: (_data, args) => {
+      const keys =
+        typeof options.invalidate === "function" ? options.invalidate(args) : options.invalidate;
+      keys.forEach((queryKey) => qc.invalidateQueries({ queryKey }));
       toast.success(options.success);
     },
     onError: (e) => toast.error(errorMessage(e)),
