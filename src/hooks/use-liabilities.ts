@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { liabilitiesRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { LiabilityInsert, LiabilityUpdate } from "@/types/database";
 
 export const liabilitiesQueryOptions = queryOptions({
   queryKey: financeKeys.liabilities,
   queryFn: () => liabilitiesRepo.listActive(),
+  ...CACHE.medium,
 });
 
 export function useLiabilities() {
@@ -28,5 +29,11 @@ export function useLiabilities() {
     success: "Liability deleted",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create, update, remove };
 }

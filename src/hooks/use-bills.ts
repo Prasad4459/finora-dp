@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { billsRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { BillInsert, BillUpdate } from "@/types/database";
 
 export const billsQueryOptions = queryOptions({
   queryKey: financeKeys.bills,
   queryFn: () => billsRepo.listUpcoming(),
+  ...CACHE.medium,
 });
 
 export function useBills() {
@@ -28,5 +29,11 @@ export function useBills() {
     success: "Bill removed",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create, update, remove };
 }

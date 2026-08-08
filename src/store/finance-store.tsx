@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { EntityDialogs } from "@/components/forms/entity-dialogs";
 import { categoriesRepo } from "@/repositories";
@@ -7,7 +7,7 @@ import { financeKeys } from "@/hooks/query-keys";
 import { errorMessage } from "@/hooks/use-entity-mutation";
 import { useWallets } from "@/hooks/use-wallets";
 import { useCategories } from "@/hooks/use-categories";
-import { useTransactions } from "@/hooks/use-transactions";
+import { useTransactionMutations } from "@/hooks/use-transactions";
 import { useAssets } from "@/hooks/use-assets";
 import { useLiabilities } from "@/hooks/use-liabilities";
 import { useGoals } from "@/hooks/use-goals";
@@ -17,7 +17,6 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
-import { toTransactionView, type TransactionView } from "@/lib/transaction-view";
 import {
   assetTypeFromLabel,
   dmyToISO,
@@ -80,19 +79,16 @@ export type EditTarget =
   | { kind: "bill"; entity: Bill };
 
 type Ctx = {
+  /** True while ANY finance query is in flight — drives the thin top bar only.
+   *  No widget may gate its own rendering on this. */
   loading: boolean;
   totals: FinanceTotals;
   /** Server-side aggregates: the only valid source of financial totals. */
   summary: FinanceSummary;
-  /** Unified ledger — every supported transaction type, newest first. */
-  transactions: TransactionView[];
-  hasMoreTransactions: boolean;
-  isLoadingMoreTransactions: boolean;
-  loadMoreTransactions: () => void;
   removeTransaction: (id: string) => void;
   accounts: Account[]; addAccount: (v: AccountInput) => void; updateAccount: (id: string, v: AccountInput) => void; removeAccount: (id: string) => void;
-  incomes: Income[]; addIncome: (v: IncomeInput) => void; updateIncome: (id: string, v: IncomeInput) => void; removeIncome: (id: string) => void;
-  expenses: Expense[]; addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
+  addIncome: (v: IncomeInput) => void; updateIncome: (id: string, v: IncomeInput) => void; removeIncome: (id: string) => void;
+  addExpense: (v: ExpenseInput) => void; updateExpense: (id: string, v: ExpenseInput) => void; removeExpense: (id: string) => void;
   addTransfer: (v: TransferInput) => void;
   addInvestment: (v: InvestmentInput) => void;
   addDividend: (v: DividendInput) => void;
@@ -124,7 +120,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const wallets = useWallets();
   const categories = useCategories();
-  const transactions = useTransactions();
+  // WRITES ONLY — the provider never downloads transaction history. Pages that
+  // display a ledger mount useLedger(); the dashboard mounts
+  // useRecentTransactions(10).
+  const transactions = useTransactionMutations();
   const assetsData = useAssets();
   const liabilitiesData = useLiabilities();
   const goalsData = useGoals();
@@ -140,50 +139,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   );
   const summary = useFinanceSummary({ extraMonths: budgetPeriods, trailingMonths: 12 });
 
-  const loading =
-    wallets.isLoading || categories.isLoading || transactions.isLoading || assetsData.isLoading ||
-    liabilitiesData.isLoading || goalsData.isLoading || budgetsData.isLoading || billsData.isLoading ||
-    summary.isLoading;
+  // Purely cosmetic top progress bar. Nothing gates rendering on this.
+  const loading = useIsFetching() > 0;
 
   const walletRows = useMemo<Wallet[]>(() => wallets.rows, [wallets.rows]);
   const categoryRows = useMemo<Category[]>(() => categories.rows, [categories.rows]);
-  const txRows = useMemo(() => transactions.rows, [transactions.rows]);
 
   const walletName = (id: string | null) => walletRows.find((w) => w.id === id)?.name ?? "—";
   const categoryName = (id: string | null) => categoryRows.find((c) => c.id === id)?.name ?? "Others";
 
   const accounts = useMemo(() => walletRows.map(toAccount), [walletRows]);
-
-  /** Single source of truth for financial activity in the UI. */
-  const ledger = useMemo(
-    () => txRows.map((t) => toTransactionView(t, { categoryName, walletName })),
-    [txRows, categoryRows, walletRows],
-  );
-
-  // Income-side history: income, dividends and refunds are all inflows.
-  const incomes = useMemo(
-    () =>
-      txRows
-        .filter((t) => t.type === "income" || t.type === "dividend" || t.type === "refund")
-        .map((t) => {
-          const row = toIncome(t, categoryName(t.category_id), walletName(t.wallet_id));
-          return t.type === "income" ? row : { ...row, category: t.type === "dividend" ? "Dividend" : "Refund" };
-        }),
-    [txRows, categoryRows, walletRows],
-  );
-
-  // Outflow-side history: expenses, EMI payments and investment purchases all
-  // leave a wallet, so none of them may disappear from the list.
-  const expenses = useMemo(
-    () =>
-      txRows
-        .filter((t) => t.type === "expense" || t.type === "emi" || t.type === "investment")
-        .map((t) => {
-          const row = toExpense(t, categoryName(t.category_id), walletName(t.wallet_id));
-          return t.type === "expense" ? row : { ...row, category: t.type === "emi" ? "EMI" : "Investment" };
-        }),
-    [txRows, categoryRows, walletRows],
-  );
 
   const assets = useMemo(() => assetsData.rows.map(toAsset), [assetsData.rows]);
   const liabilities = useMemo(() => liabilitiesData.rows.map(toLiability), [liabilitiesData.rows]);
@@ -361,12 +326,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     loading,
     totals,
     summary,
-    transactions: ledger,
-    hasMoreTransactions: transactions.hasMore,
-    isLoadingMoreTransactions: transactions.isLoadingMore,
-    loadMoreTransactions: () => transactions.loadMore(),
     removeTransaction: (id) => transactions.remove.mutate(id),
-    accounts, incomes, expenses, assets, liabilities, goals, budgets, bills, notifications,
+    accounts, assets, liabilities, goals, budgets, bills, notifications,
 
     addAccount: (v) => wallets.create.mutate(walletCreatePayload(v)),
     updateAccount: (id, v) => wallets.update.mutate({ id, values: walletUpdatePayload(v) }),

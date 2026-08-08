@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { goalsRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { GoalInsert, GoalUpdate } from "@/types/database";
 
 export const goalsQueryOptions = queryOptions({
   queryKey: financeKeys.goals,
   queryFn: () => goalsRepo.listActive(),
+  ...CACHE.medium,
 });
 
 export function useGoals() {
@@ -28,5 +29,11 @@ export function useGoals() {
     success: "Goal deleted",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create, update, remove };
 }

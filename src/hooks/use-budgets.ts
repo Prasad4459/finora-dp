@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { budgetsRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { BudgetInsert, BudgetUpdate } from "@/types/database";
 
 export const budgetsQueryOptions = queryOptions({
   queryKey: financeKeys.budgets,
   queryFn: () => budgetsRepo.list({ orderBy: "created_at" }),
+  ...CACHE.medium,
 });
 
 export function useBudgets() {
@@ -28,5 +29,11 @@ export function useBudgets() {
     success: "Budget removed",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create, update, remove };
 }

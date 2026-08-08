@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { categoriesRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { CategoryInsert } from "@/types/database";
 
 export const categoriesQueryOptions = queryOptions({
   queryKey: financeKeys.categories,
   queryFn: () => categoriesRepo.listAll(),
+  ...CACHE.long,
 });
 
 export function useCategories() {
@@ -18,5 +19,11 @@ export function useCategories() {
     success: "Category added",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create };
 }

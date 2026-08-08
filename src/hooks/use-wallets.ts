@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { walletsRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { WalletInsert, WalletUpdate } from "@/types/database";
 
 export const walletsQueryOptions = queryOptions({
   queryKey: financeKeys.wallets,
   queryFn: () => walletsRepo.listActive(),
+  ...CACHE.medium,
 });
 
 export function useWallets() {
@@ -28,5 +29,11 @@ export function useWallets() {
     success: "Account deleted",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create, update, remove };
 }

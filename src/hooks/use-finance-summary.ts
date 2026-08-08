@@ -10,7 +10,7 @@ import {
   todayISO,
   type MonthRef,
 } from "@/lib/date-in";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import {
   addAggregates,
   emptyMonthAggregate,
@@ -74,10 +74,12 @@ export function useFinanceSummary(window: SummaryWindow = {}) {
   const summary = useQuery({
     queryKey: [...financeKeys.summary, from, to] as const,
     queryFn: () => analyticsRepo.summaryMonthly(from, to),
+    ...CACHE.medium,
   });
   const categories = useQuery({
     queryKey: [...financeKeys.categorySummary, from, to] as const,
     queryFn: () => analyticsRepo.categoryMonthly(from, to),
+    ...CACHE.medium,
   });
 
   const byMonth = toAggregates(summary.data ?? []);
@@ -119,6 +121,15 @@ export function useFinanceSummary(window: SummaryWindow = {}) {
 
   return {
     isLoading: summary.isLoading || categories.isLoading,
+    /** True when either aggregate failed — callers must NOT render ₹0. */
+    isError: summary.isError || categories.isError,
+    error: summary.error ?? categories.error,
+    /** No data has ever loaded (distinguishes "failed" from "genuinely zero"). */
+    hasData: summary.data !== undefined && categories.data !== undefined,
+    refetch: () => {
+      void summary.refetch();
+      void categories.refetch();
+    },
     today: todayISO(),
     current,
     aggregateFor,

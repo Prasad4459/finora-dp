@@ -1,12 +1,13 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { assetsRepo } from "@/repositories";
-import { financeKeys } from "./query-keys";
+import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { AssetInsert, AssetUpdate } from "@/types/database";
 
 export const assetsQueryOptions = queryOptions({
   queryKey: financeKeys.assets,
   queryFn: () => assetsRepo.listAll(),
+  ...CACHE.medium,
 });
 
 export function useAssets() {
@@ -28,5 +29,11 @@ export function useAssets() {
     success: "Asset deleted",
   });
 
-  return { rows: query.data ?? [], isLoading: query.isLoading, create, update, remove };
+  return {
+    rows: query.data ?? [],
+    data: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    refetch: () => void query.refetch(), create, update, remove };
 }
