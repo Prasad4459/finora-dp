@@ -177,6 +177,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const goalsData = useGoals();
   const budgetsData = useBudgets();
   const billsData = useBills();
+  const contributionsData = useInvestmentContributions();
   const notificationsData = useNotifications();
 
   // In-app bill reminders (deduplicated per bill occurrence).
@@ -318,12 +319,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     wallet_id: resolveWalletId(v.account),
   });
 
+  const numOrNull = (v: unknown) => {
+    const n = Number(v);
+    return v === undefined || v === null || v === "" || !Number.isFinite(n) ? null : n;
+  };
+
   const assetPayload = (v: AssetInput) => ({
     name: v.name,
     type: assetTypeFromLabel(v.type),
     purchase_value: v.purchase,
     current_value: v.current,
     purchase_date: v.date || todayISODate(),
+    // Investment facet — only the fields the chosen instrument actually needs.
+    units: numOrNull(v.units),
+    last_price: numOrNull(v.lastPrice),
+    interest_rate: numOrNull(v.rate),
+    compounding: v.compounding || null,
+    maturity_date: v.maturityDate || null,
+    folio_number: v.folio || null,
+    institution: v.institution || null,
   });
 
   const liabilityPayload = (v: LiabilityInput) => ({
