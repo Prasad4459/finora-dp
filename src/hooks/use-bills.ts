@@ -8,7 +8,7 @@ import { BILL_PAYMENT_KEYS, CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import { formatINR } from "@/lib/format";
 import { todayISO } from "@/lib/date-in";
-import { nextDueDate, occurrenceKey, type Frequency } from "@/services/bills";
+import { nextDueDate, type Frequency } from "@/services/bills";
 import type { BillInsert, BillRow, BillUpdate } from "@/types/database";
 
 export const billsQueryOptions = queryOptions({
@@ -45,7 +45,6 @@ export async function payBill(input: PayBillInput) {
   if (!input.walletId) throw new Error("Select an account for this transaction.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("Enter a valid amount");
   const dueISO = (bill.due_date ?? todayISO()).slice(0, 10);
-  const periodKey = occurrenceKey(dueISO);
   const next = bill.is_recurring ? nextDueDate(dueISO, bill.frequency as Frequency) : null;
 
   // Claim + expense insert + wallet debit + bill roll-forward are one database
@@ -66,7 +65,7 @@ export async function payBill(input: PayBillInput) {
       type: "bill_reminder",
       title: `${bill.name} paid`,
       message: `${formatINR(input.amount)} paid from your account on ${input.paidDate}.`,
-      dedupe_key: `bill:${bill.id}:${periodKey}:paid`,
+      dedupe_key: `bill:${bill.id}:${dueISO}:paid`,
       is_read: false,
     })
     .catch(() => undefined); // a duplicate notification must never fail a payment
