@@ -51,7 +51,13 @@ import type {
 export type AccountInput = Omit<Account, "id" | "icon" | "color" | "updated">;
 export type IncomeInput = Omit<Income, "id">;
 export type ExpenseInput = Omit<Expense, "id">;
-export type AssetInput = Omit<Asset, "id">;
+export type AssetInput = Omit<Asset, "id"> & {
+  /** Wallet UUID that funds the purchase. When present, the holding is created
+   *  through the ledger (an investment transaction debits this account). */
+  fundingWalletId?: string;
+  /** EPF / NPS: the asset grows with no wallet outflow. */
+  employerFunded?: boolean;
+};
 export type LiabilityInput = Omit<Liability, "id" | "remaining" | "status">;
 export type GoalInput = { name: string; iconKey: string; target: number; current: number; date: string };
 export type BudgetInput = { name: string; budget: number; spent?: number };
