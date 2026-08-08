@@ -71,12 +71,15 @@ export type BillInput = {
 export type TransferInput = { from: string; to: string; amount: number; date: string; notes?: string };
 export type InvestmentInput = {
   asset: string;
-  account: string;
+  /** Empty when the contribution is employer-funded (EPF / NPS). */
+  account?: string;
   amount: number;
   date: string;
   notes?: string;
   units?: number;
   pricePerUnit?: number;
+  /** True: the asset grows but no wallet is debited. */
+  employerFunded?: boolean;
 };
 /** Selling / withdrawing an investment: cash returns to a wallet. */
 export type RedemptionInput = {
@@ -348,10 +351,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     purchase_date: v.date || todayISODate(),
     // Investment facet — only the fields the chosen instrument actually needs.
     units: numOrNull(v.units),
+    avg_cost: numOrNull(v.avgCost),
     last_price: numOrNull(v.lastPrice),
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,
+    maturity_value: numOrNull(v.maturityValue),
     folio_number: v.folio || null,
     institution: v.institution || null,
   });
@@ -457,16 +462,89 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       run(async () => {
         const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
         if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        // EMPLOYER-FUNDED CONTRIBUTIONS (EPF / NPS)
+        // The asset grows but the user's bank balance never moved, so the
+        // transaction carries no wallet: the trigger then skips the debit.
+        const walletId = v.employerFunded ? null : requireWalletId(v.account ?? "", "Source");
         createTx({
           type: "investment",
           amount: v.amount,
           transaction_date: v.date || todayISODate(),
-          wallet_id: requireWalletId(v.account, "Source"),
+          wallet_id: walletId,
           asset_id: asset.id,
           payee: v.asset,
+          units: v.units ?? null,
+          price_per_unit: v.pricePerUnit ?? null,
           category_id: await resolveCategoryId("Investment", "expense"),
+          notes: v.notes || (v.employerFunded ? "Employer contribution" : null),
+        } as Omit<TransactionInsert, "user_id">);
+      }),
+
+    // Redemption / sale: units leave the asset, cash returns to a wallet.
+    // The proceeds are NOT income — only the realised gain is performance.
+    addRedemption: (v) =>
+      run(async () => {
+        const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
+        if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        const held = Number((asset as { units?: number | null }).units ?? 0);
+        if (v.units && held > 0 && v.units > held + 1e-6) {
+          throw new Error(`You only hold ${held} units of ${asset.name}`);
+        }
+        createTx({
+          type: "redemption",
+          amount: v.amount,
+          transaction_date: v.date || todayISODate(),
+          wallet_id: requireWalletId(v.account, "Destination"),
+          asset_id: asset.id,
+          payee: v.asset,
+          units: v.units ?? null,
+          price_per_unit: v.units ? Number((v.amount / v.units).toFixed(4)) : null,
           notes: v.notes || null,
         } as Omit<TransactionInsert, "user_id">);
+      }),
+
+    contributions,
+
+    // A schedule is a DEFINITION: no future transactions are materialised.
+    addSip: (v) =>
+      run(async () => {
+        const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
+        if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        contributionsData.create.mutate({
+          asset_id: asset.id,
+          wallet_id: resolveWalletId(v.account),
+          amount: v.amount,
+          frequency: frequencyFromLabel(v.frequency || "Monthly"),
+          next_due_date: v.nextDue || todayISODate(),
+          auto_debit: v.autoDebit ?? false,
+          status: "active",
+        });
+      }),
+
+    removeSip: (id) => contributionsData.remove.mutate(id),
+
+    // Records ONE instalment as a real investment transaction and rolls the
+    // schedule forward to its next occurrence.
+    recordSipContribution: (id, date) =>
+      run(async () => {
+        const row = contributionsData.rows.find((c) => c.id === id);
+        if (!row) throw new Error("Contribution schedule was not found");
+        const on = date || row.next_due_date?.slice(0, 10) || todayISODate();
+        createTx({
+          type: "investment",
+          amount: Number(row.amount),
+          transaction_date: on,
+          wallet_id: row.wallet_id,
+          asset_id: row.asset_id,
+          payee: assetName(row.asset_id),
+          category_id: await resolveCategoryId("Investment", "expense"),
+          notes: "Scheduled contribution",
+        } as Omit<TransactionInsert, "user_id">);
+        const next = nextDueDate(on, row.frequency);
+        contributionsData.update.mutate({
+          id,
+          values: next ? { next_due_date: next } : { status: "completed" },
+        });
       }),
 
     addDividend: (v) =>

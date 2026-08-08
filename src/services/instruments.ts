@@ -10,6 +10,21 @@ export type AssetClass = "equity" | "debt" | "small_savings" | "gold" | "alterna
 /** How an instrument's current value is arrived at. */
 export type ValuationMode = "market" | "accrual" | "manual";
 
+/** Every field an instrument form can ask for. */
+export type InstrumentField =
+  | "institution"
+  | "folio"
+  | "units"
+  | "avgCost"
+  | "lastPrice"
+  | "purchase"
+  | "current"
+  | "rate"
+  | "compounding"
+  | "maturityDate"
+  | "maturityValue"
+  | "date";
+
 export type InstrumentMeta = {
   /** Display label, matching ASSET_TYPES in constants/finance.ts. */
   label: string;
@@ -25,6 +40,16 @@ export type InstrumentMeta = {
   schedule: boolean;
   /** Counts as invested capital rather than a physical holding. */
   investment: boolean;
+  /** A market price per unit is meaningful. */
+  price: boolean;
+  /** Can be sold / withdrawn back into a wallet. */
+  redeemable: boolean;
+  /** Statutory lock-in in years, when one applies. */
+  lockInYears?: number;
+  /** Can be funded by an employer (EPF / NPS) without a wallet outflow. */
+  employerFunded?: boolean;
+  /** Exact fields the dynamic form should render, in order. */
+  fields: InstrumentField[];
 };
 
 const DEFAULT_META: InstrumentMeta = {
@@ -36,9 +61,56 @@ const DEFAULT_META: InstrumentMeta = {
   maturity: false,
   schedule: false,
   investment: false,
+  price: false,
+  redeemable: false,
+  fields: ["purchase", "current", "date"],
 };
 
-const m = (meta: Partial<InstrumentMeta> & { label: string }): InstrumentMeta => ({ ...DEFAULT_META, ...meta });
+/** Field presets, so no component ever hard-codes instrument knowledge. */
+const UNIT_FIELDS: InstrumentField[] = [
+  "institution",
+  "folio",
+  "purchase",
+  "units",
+  "lastPrice",
+  "current",
+  "date",
+];
+const DEPOSIT_FIELDS: InstrumentField[] = [
+  "institution",
+  "purchase",
+  "rate",
+  "compounding",
+  "date",
+  "maturityDate",
+  "maturityValue",
+  "current",
+];
+const SMALL_SAVINGS_FIELDS: InstrumentField[] = [
+  "institution",
+  "folio",
+  "purchase",
+  "rate",
+  "compounding",
+  "date",
+  "maturityDate",
+  "current",
+];
+
+const m = (meta: Partial<InstrumentMeta> & { label: string }): InstrumentMeta => {
+  const merged = { ...DEFAULT_META, ...meta };
+  // Units imply a market price unless explicitly overridden.
+  if (meta.price === undefined) merged.price = merged.units;
+  if (meta.redeemable === undefined) merged.redeemable = merged.investment;
+  if (!meta.fields) {
+    merged.fields = merged.units
+      ? UNIT_FIELDS
+      : merged.rate
+        ? DEPOSIT_FIELDS
+        : DEFAULT_META.fields;
+  }
+  return merged;
+};
 
 /** Keyed by the display label used across the UI. */
 export const INSTRUMENTS: Record<string, InstrumentMeta> = {
@@ -56,17 +128,21 @@ export const INSTRUMENTS: Record<string, InstrumentMeta> = {
   RD: m({ label: "RD", assetClass: "debt", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true }),
   Bonds: m({ label: "Bonds", assetClass: "debt", valuation: "accrual", rate: true, maturity: true, investment: true }),
 
-  PPF: m({ label: "PPF", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true }),
-  EPF: m({ label: "EPF", assetClass: "small_savings", valuation: "accrual", rate: true, schedule: true, investment: true }),
-  NPS: m({ label: "NPS", assetClass: "small_savings", valuation: "market", units: true, schedule: true, investment: true }),
-  "Sukanya Samriddhi": m({ label: "Sukanya Samriddhi", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true }),
-  NSC: m({ label: "NSC", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true }),
-  KVP: m({ label: "KVP", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true }),
-  SCSS: m({ label: "SCSS", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true }),
-  "Post Office": m({ label: "Post Office", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true }),
+  PPF: m({ label: "PPF", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true, redeemable: false, lockInYears: 15, fields: SMALL_SAVINGS_FIELDS }),
+  EPF: m({ label: "EPF", assetClass: "small_savings", valuation: "accrual", rate: true, schedule: true, investment: true, redeemable: false, employerFunded: true, fields: ["institution", "folio", "purchase", "rate", "compounding", "date", "current"] }),
+  NPS: m({ label: "NPS", assetClass: "small_savings", valuation: "market", units: true, schedule: true, investment: true, redeemable: false, lockInYears: 60, employerFunded: true }),
+  "Sukanya Samriddhi": m({ label: "Sukanya Samriddhi", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true, redeemable: false, lockInYears: 21, fields: SMALL_SAVINGS_FIELDS }),
+  NSC: m({ label: "NSC", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true, lockInYears: 5, fields: SMALL_SAVINGS_FIELDS }),
+  KVP: m({ label: "KVP", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true, lockInYears: 2.5, fields: SMALL_SAVINGS_FIELDS }),
+  SCSS: m({ label: "SCSS", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true, lockInYears: 5, fields: SMALL_SAVINGS_FIELDS }),
+  "Post Office": m({ label: "Post Office", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true, fields: SMALL_SAVINGS_FIELDS }),
 
   Gold: m({ label: "Gold", assetClass: "gold", valuation: "market", units: true, investment: true }),
   Silver: m({ label: "Silver", assetClass: "gold", valuation: "market", units: true, investment: true }),
+  "Digital Gold": m({ label: "Digital Gold", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
+  "Gold ETF": m({ label: "Gold ETF", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
+  "Gold Fund": m({ label: "Gold Fund", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
+  "Sovereign Gold Bond": m({ label: "Sovereign Gold Bond", assetClass: "gold", valuation: "market", units: true, maturity: true, investment: true, lockInYears: 5, fields: ["institution", "folio", "purchase", "units", "lastPrice", "current", "date", "maturityDate"] }),
 
   Property: m({ label: "Property", assetClass: "physical" }),
   Vehicle: m({ label: "Vehicle", assetClass: "physical" }),

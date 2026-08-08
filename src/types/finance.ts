@@ -45,8 +45,11 @@ export type Asset = {
   rate?: number | null;
   compounding?: string | null;
   maturityDate?: string | null;
+  maturityValue?: number | null;
   folio?: string | null;
   institution?: string | null;
+  /** False once a holding has been fully redeemed (kept for history). */
+  isActive?: boolean;
 };
 
 /** A scheduled recurring contribution (SIP / RD instalment / yearly deposit). */

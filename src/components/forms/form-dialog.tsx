@@ -111,7 +111,7 @@ export function FormDialog({
               ) : f.type === "switch" ? (
                 <div className="flex items-center gap-2">
                   <Switch checked={!!values[f.key]} onCheckedChange={(v) => set(f.key, v)} />
-                  <span className="text-xs text-muted-foreground">Repeat this every period</span>
+                  <span className="text-xs text-muted-foreground">{f.hint ?? "Repeat this every period"}</span>
                 </div>
               ) : f.type === "textarea" ? (
                 <Textarea value={String(values[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder} />

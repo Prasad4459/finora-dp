@@ -904,6 +904,10 @@ export type Database = {
         | "kvp"
         | "scss"
         | "post_office"
+        | "digital_gold"
+        | "gold_etf"
+        | "gold_fund"
+        | "sovereign_gold_bond"
       bill_frequency:
         | "one_time"
         | "weekly"
@@ -1098,6 +1102,10 @@ export const Constants = {
         "kvp",
         "scss",
         "post_office",
+        "digital_gold",
+        "gold_etf",
+        "gold_fund",
+        "sovereign_gold_bond",
       ],
       bill_frequency: [
         "one_time",
