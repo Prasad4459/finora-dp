@@ -1,6 +1,7 @@
 // Pure, React-free finance calculations. Everything here is testable in
 // isolation and must never import components, hooks or the Supabase client.
-import type { Account, Asset, Budget, Expense, Income, Liability } from "@/types/finance";
+import type { Account, Asset, Budget, Liability } from "@/types/finance";
+import type { TransactionView } from "@/lib/transaction-view";
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -17,6 +18,41 @@ export const sum = <T,>(list: T[], pick: (item: T) => number) =>
 /** Asset types treated as invested capital rather than physical holdings. */
 export const INVESTMENT_ASSET_TYPES = ["Stocks", "Mutual Funds", "PPF", "EPF", "NPS", "Crypto", "FD"];
 
+/**
+ * Asset types that mirror money already tracked by a wallet. Counting them in
+ * net worth on top of wallet balances would double-count the same rupees.
+ */
+export const WALLET_MIRRORED_ASSET_TYPES = ["Cash", "Bank"];
+
+export type Cashflow = {
+  income: number;
+  expenses: number;
+  invested: number;
+  transfersIn: number;
+  transfersOut: number;
+  net: number;
+};
+
+/**
+ * Month cash-flow derived from the unified transaction list.
+ * - income  = income + dividend (refunds are netted off expenses instead)
+ * - expense = expenses + EMI interest − refunds  (EMI principal is debt
+ *   repayment, and an investment converts cash into an asset — neither is
+ *   consumption)
+ * - transfers never count as income or expense.
+ */
+export function computeCashflow(transactions: TransactionView[], monthKey = currentMonthKey()): Cashflow {
+  const inMonth = transactions.filter((t) => isInMonth(t.date, monthKey));
+  const of = (type: string) => inMonth.filter((t) => t.type === type);
+  const income = sum(of("income"), (t) => t.amount) + sum(of("dividend"), (t) => t.amount);
+  const refunds = sum(of("refund"), (t) => t.amount);
+  const emiInterest = sum(of("emi"), (t) => t.interest);
+  const expenses = Math.max(0, sum(of("expense"), (t) => t.amount) + emiInterest - refunds);
+  const invested = sum(of("investment"), (t) => t.amount);
+  const transfersOut = sum(of("transfer"), (t) => t.amount);
+  return { income, expenses, invested, transfersIn: transfersOut, transfersOut, net: income - expenses };
+}
+
 export type FinanceTotals = {
   totalBalance: number;
   totalAssets: number;
@@ -27,26 +63,30 @@ export type FinanceTotals = {
   monthExpenses: number;
   savingsRate: number;
   monthlyEmi: number;
+  monthInvested: number;
 };
 
 export function computeTotals(input: {
   accounts: Account[];
   assets: Asset[];
   liabilities: Liability[];
-  incomes: Income[];
-  expenses: Expense[];
+  transactions: TransactionView[];
   monthKey?: string;
 }): FinanceTotals {
   const monthKey = input.monthKey ?? currentMonthKey();
   const totalBalance = sum(input.accounts, (a) => a.balance);
-  const totalAssets = sum(input.assets, (a) => a.current);
+  // Wallet-mirrored assets (plain cash / bank holdings) are excluded so the
+  // same money is not counted twice in net worth.
+  const netWorthAssets = input.assets.filter((a) => !WALLET_MIRRORED_ASSET_TYPES.includes(a.type));
+  const totalAssets = sum(netWorthAssets, (a) => a.current);
   const totalInvestments = sum(
     input.assets.filter((a) => INVESTMENT_ASSET_TYPES.includes(a.type)),
     (a) => a.current,
   );
   const totalDebt = sum(input.liabilities, (l) => l.balance);
-  const monthIncome = sum(input.incomes.filter((i) => isInMonth(i.date, monthKey)), (i) => i.amount);
-  const monthExpenses = sum(input.expenses.filter((e) => isInMonth(e.date, monthKey)), (e) => e.amount);
+  const flow = computeCashflow(input.transactions, monthKey);
+  const monthIncome = flow.income;
+  const monthExpenses = flow.expenses;
   const savingsRate = monthIncome > 0 ? Math.round(((monthIncome - monthExpenses) / monthIncome) * 100) : 0;
 
   return {
@@ -54,11 +94,13 @@ export function computeTotals(input: {
     totalAssets,
     totalInvestments,
     totalDebt,
+    // Net worth = (liquid balances + non-mirrored assets) − liabilities.
     netWorth: totalBalance + totalAssets - totalDebt,
     monthIncome,
     monthExpenses,
     savingsRate,
     monthlyEmi: sum(input.liabilities, (l) => l.emi),
+    monthInvested: flow.invested,
   };
 }
 

@@ -411,14 +411,19 @@ export type Database = {
       transactions: {
         Row: {
           amount: number
+          asset_id: string | null
           attachment_url: string | null
           category_id: string | null
           created_at: string
+          goal_id: string | null
           id: string
+          interest_amount: number | null
           is_recurring: boolean
+          liability_id: string | null
           notes: string | null
           payee: string | null
           payment_method: string | null
+          principal_amount: number | null
           status: Database["public"]["Enums"]["transaction_status"]
           to_wallet_id: string | null
           transaction_date: string
@@ -429,14 +434,19 @@ export type Database = {
         }
         Insert: {
           amount: number
+          asset_id?: string | null
           attachment_url?: string | null
           category_id?: string | null
           created_at?: string
+          goal_id?: string | null
           id?: string
+          interest_amount?: number | null
           is_recurring?: boolean
+          liability_id?: string | null
           notes?: string | null
           payee?: string | null
           payment_method?: string | null
+          principal_amount?: number | null
           status?: Database["public"]["Enums"]["transaction_status"]
           to_wallet_id?: string | null
           transaction_date?: string
@@ -447,14 +457,19 @@ export type Database = {
         }
         Update: {
           amount?: number
+          asset_id?: string | null
           attachment_url?: string | null
           category_id?: string | null
           created_at?: string
+          goal_id?: string | null
           id?: string
+          interest_amount?: number | null
           is_recurring?: boolean
+          liability_id?: string | null
           notes?: string | null
           payee?: string | null
           payment_method?: string | null
+          principal_amount?: number | null
           status?: Database["public"]["Enums"]["transaction_status"]
           to_wallet_id?: string | null
           transaction_date?: string
@@ -465,10 +480,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "transactions_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_liability_id_fkey"
+            columns: ["liability_id"]
+            isOneToOne: false
+            referencedRelation: "liabilities"
             referencedColumns: ["id"]
           },
           {
@@ -588,7 +624,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      tx_apply: {
+        Args: {
+          _sign: number
+          _t: Database["public"]["Tables"]["transactions"]["Row"]
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       asset_type:

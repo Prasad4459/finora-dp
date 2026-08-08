@@ -29,8 +29,8 @@ const trend = [
 ];
 
 export function Expenses() {
-  const { expenses, openDialog, openEditDialog, removeExpense } = useFinance();
-  const monthTotal = expenses.filter((e) => e.date.startsWith("2026-07")).reduce((s, e) => s + e.amount, 0);
+  const { expenses, openDialog, openEditDialog, removeExpense, totals, hasMoreTransactions, isLoadingMoreTransactions, loadMoreTransactions } = useFinance();
+  const monthTotal = totals.monthExpenses;
   const ytd = expenses.reduce((s, e) => s + e.amount, 0);
   const avg = Math.round(ytd / trend.length);
   return (
@@ -115,6 +115,13 @@ export function Expenses() {
               ))}
             </TableBody>
           </Table>
+          {hasMoreTransactions && (
+            <div className="flex justify-center p-3">
+              <Button variant="ghost" size="sm" disabled={isLoadingMoreTransactions} onClick={loadMoreTransactions}>
+                {isLoadingMoreTransactions ? "Loading..." : "Load more"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

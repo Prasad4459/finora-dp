@@ -1,7 +1,7 @@
 export { createRepository, currentUserId } from "./base.repo";
 export { walletsRepo } from "./wallets.repo";
 export { categoriesRepo } from "./categories.repo";
-export { transactionsRepo } from "./transactions.repo";
+export { transactionsRepo, DEFAULT_PAGE_SIZE } from "./transactions.repo";
 export { assetsRepo } from "./assets.repo";
 export { liabilitiesRepo } from "./liabilities.repo";
 export { goalsRepo } from "./goals.repo";

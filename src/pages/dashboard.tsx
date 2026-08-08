@@ -21,6 +21,9 @@ import {
   PiggyBank,
   Sparkles,
   Receipt,
+  ArrowLeftRight,
+  Banknote,
+  RotateCcw,
 } from "lucide-react";
 import {
   Area,
@@ -47,6 +50,9 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { formatINR, formatINRExact, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
+import { computeHealthScore } from "@/services/finance";
+import { TRANSACTION_LABEL } from "@/lib/transaction-view";
+import { formatDateIN } from "@/lib/format";
 
 
 const cashFlowData = [
@@ -78,14 +84,6 @@ const expenseBreakdown = [
   { name: "Miscellaneous", value: 2500, color: "var(--muted-foreground)" },
 ];
 
-const recentTransactions = [
-  { id: 1, name: "BigBasket", category: "Groceries", account: "HDFC •• 4021", date: "02/07/2026", amount: -2450, icon: ShoppingBag },
-  { id: 2, name: "Salary — Infosys Ltd.", category: "Salary", account: "SBI •• 8891", date: "01/07/2026", amount: 85000, icon: ArrowDownCircle },
-  { id: 3, name: "Ola Cabs", category: "Travel", account: "ICICI •• 1009", date: "30/06/2026", amount: -320, icon: Car },
-  { id: 4, name: "Netflix", category: "Entertainment", account: "HDFC •• 4021", date: "29/06/2026", amount: -649, icon: Film },
-  { id: 5, name: "Swiggy", category: "Food & Dining", account: "Axis •• 3320", date: "29/06/2026", amount: -540, icon: Utensils },
-  { id: 6, name: "Apollo Pharmacy", category: "Healthcare", account: "HDFC •• 4021", date: "28/06/2026", amount: -820, icon: Heart },
-];
 
 const upcomingBills = [
   { id: 1, name: "Rent", due: "05/07/2026", amount: 18000, icon: Home },
@@ -148,17 +146,16 @@ function WelcomeHeader({ onAdd }: { onAdd: () => void }) {
 }
 
 function DashboardInner() {
-  const { openDialog, accounts, incomes, expenses, assets, liabilities, bills: allBills, goals: allGoals } = useFinance();
-  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
-  const totalInvestments = assets.filter((a) => ["Stocks", "Mutual Funds", "PPF", "EPF", "NPS", "Crypto", "FD"].includes(a.type)).reduce((s, a) => s + a.current, 0);
-  const totalAssets = assets.reduce((s, a) => s + a.current, 0);
-  const totalDebt = liabilities.reduce((s, l) => s + l.balance, 0);
-  const netWorth = totalBalance + totalAssets - totalDebt;
-  const monthIncome = incomes.filter((i) => i.date.startsWith("2026-07")).reduce((s, i) => s + i.amount, 0) || incomes.slice(0, 3).reduce((s, i) => s + i.amount, 0);
-  const monthExpenses = expenses.filter((e) => e.date.startsWith("2026-07")).reduce((s, e) => s + e.amount, 0);
+  const {
+    openDialog, accounts, incomes, expenses, liabilities, bills: allBills, goals: allGoals,
+    totals, transactions: ledger,
+  } = useFinance();
+  // All financial maths lives in the pure services layer (via the store).
+  const { totalBalance, totalInvestments, totalDebt, netWorth, monthIncome, monthExpenses, savingsRate } = totals;
   const upcomingTotal = allBills.reduce((s, b) => s + b.amount, 0);
-  const savingsRate = monthIncome > 0 ? Math.round(((monthIncome - monthExpenses) / monthIncome) * 100) : 0;
-  const healthScore = 78;
+  const health = computeHealthScore(totals);
+  const healthScore = health.score;
+  const recent = ledger.slice(0, 6);
   return (
     <div className="mx-auto max-w-7xl">
       <WelcomeHeader onAdd={() => openDialog("expense")} />
@@ -203,6 +200,26 @@ function DashboardInner() {
             <Button variant="secondary" size="sm" onClick={() => openDialog("liability")}>
               <CreditCard className="mr-1.5 h-4 w-4" />
               Add liability
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => openDialog("transfer")}>
+              <ArrowLeftRight className="mr-1.5 h-4 w-4" />
+              Transfer
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => openDialog("investment")}>
+              <TrendingUp className="mr-1.5 h-4 w-4" />
+              Invest
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => openDialog("emi")}>
+              <Banknote className="mr-1.5 h-4 w-4" />
+              Pay EMI
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => openDialog("dividend")}>
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              Dividend
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => openDialog("refund")}>
+              <RotateCcw className="mr-1.5 h-4 w-4" />
+              Refund
             </Button>
             <Button variant="secondary" size="sm" onClick={() => openDialog("goal")}>
               <Target className="mr-1.5 h-4 w-4" />
@@ -439,9 +456,13 @@ function DashboardInner() {
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-border">
-              {recentTransactions.map((t) => {
-                const positive = t.amount > 0;
-                const Icon = t.icon;
+              {recent.length === 0 && (
+                <li className="px-5 py-6 text-sm text-muted-foreground">No transactions yet.</li>
+              )}
+              {recent.map((t) => {
+                const positive = t.direction === "in";
+                const neutral = t.direction === "neutral";
+                const Icon = positive ? ArrowDownCircle : neutral ? ArrowLeftRight : ShoppingBag;
                 return (
                   <li key={t.id} className="flex items-center gap-3 px-5 py-3">
                     <div
@@ -453,12 +474,12 @@ function DashboardInner() {
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{t.name}</div>
+                      <div className="truncate text-sm font-medium">{t.title}</div>
                       <div className="truncate text-xs text-muted-foreground">
-                        {t.category} • {t.account}
+                        {TRANSACTION_LABEL[t.type]} • {t.category} • {t.account}
                       </div>
                     </div>
-                    <div className="hidden text-xs text-muted-foreground sm:block">{t.date}</div>
+                    <div className="hidden text-xs text-muted-foreground sm:block">{formatDateIN(t.date)}</div>
                     <div
                       className={cn(
                         "flex items-center gap-1 text-sm font-semibold tabular-nums",
@@ -466,7 +487,7 @@ function DashboardInner() {
                       )}
                     >
                       {positive ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                      {positive ? "+" : "-"}
+                      {positive ? "+" : neutral ? "" : "-"}
                       {currencyExact(Math.abs(t.amount))}
                     </div>
                   </li>

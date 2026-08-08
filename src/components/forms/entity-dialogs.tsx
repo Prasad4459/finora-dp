@@ -56,6 +56,10 @@ export function EntityDialogs({
   onClose: () => void;
 }) {
   const f = useFinance();
+  const accountNames = f.accounts.map((a) => a.name);
+  const assetNames = f.assets.map((a) => a.name);
+  const liabilityNames = f.liabilities.map((l) => l.name);
+  const goalNames = f.goals.map((g) => g.name);
   const today = todayISO();
   const initial = initialFor(editing);
   const editId = editing?.entity.id ?? null;
@@ -129,6 +133,53 @@ export function EntityDialogs({
     { key: "due", label: "Due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true },
   ];
 
+  const transferFields: FieldDef[] = [
+    { key: "from", label: "From account", type: "select", options: accountNames, required: true },
+    { key: "to", label: "To account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
+  ];
+
+  const investmentFields: FieldDef[] = [
+    { key: "asset", label: "Invest into (asset)", type: "select", options: assetNames, required: true },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Optional" },
+  ];
+
+  const dividendFields: FieldDef[] = [
+    { key: "source", label: "Source", type: "text", required: true, placeholder: "e.g. TCS Dividend" },
+    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
+  const refundFields: FieldDef[] = [
+    { key: "merchant", label: "Refunded by", type: "text", required: true },
+    { key: "category", label: "Original category", type: "select", options: EXPENSE_CATEGORIES as unknown as string[] },
+    { key: "account", label: "Credited to account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
+  const emiFields: FieldDef[] = [
+    { key: "liability", label: "Loan / liability", type: "select", options: liabilityNames, required: true },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "EMI amount (₹)", type: "number", required: true },
+    { key: "principal", label: "Principal portion (₹)", type: "number" },
+    { key: "interest", label: "Interest portion (₹)", type: "number" },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
+  const contributionFields: FieldDef[] = [
+    { key: "goal", label: "Goal", type: "select", options: goalNames, required: true },
+    { key: "account", label: "Paid from account", type: "select", options: accountNames, required: true },
+    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    { key: "date", label: "Date", type: "date", default: today },
+  ];
+
   return (
     <>
       <FormDialog open={open === "account"} onClose={onClose} title={isEdit("account") ? "Edit account" : "Add account"} fields={accountFields} {...common("account")}
@@ -178,6 +229,24 @@ export function EntityDialogs({
           const payload = { name: v.name, category: v.category, iconKey: v.iconKey || "Receipt", amount: Number(v.amount), due: v.due || todayDMY() };
           isEdit("bill") ? f.updateBill(editId!, payload) : f.addBill(payload);
         }}
+      />
+      <FormDialog open={open === "transfer"} onClose={onClose} title="Transfer between accounts" fields={transferFields}
+        onSubmit={(v) => f.addTransfer({ from: v.from, to: v.to, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+      />
+      <FormDialog open={open === "investment"} onClose={onClose} title="Record investment" fields={investmentFields}
+        onSubmit={(v) => f.addInvestment({ asset: v.asset, account: v.account, amount: Number(v.amount), date: v.date || today, notes: v.notes })}
+      />
+      <FormDialog open={open === "dividend"} onClose={onClose} title="Record dividend" fields={dividendFields}
+        onSubmit={(v) => f.addDividend({ source: v.source, account: v.account, amount: Number(v.amount), date: v.date || today })}
+      />
+      <FormDialog open={open === "refund"} onClose={onClose} title="Record refund" fields={refundFields}
+        onSubmit={(v) => f.addRefund({ merchant: v.merchant, category: v.category, account: v.account, amount: Number(v.amount), date: v.date || today })}
+      />
+      <FormDialog open={open === "emi"} onClose={onClose} title="Record EMI payment" fields={emiFields}
+        onSubmit={(v) => f.addEmiPayment({ liability: v.liability, account: v.account, amount: Number(v.amount), principal: Number(v.principal || 0), interest: Number(v.interest || 0), date: v.date || today })}
+      />
+      <FormDialog open={open === "contribution"} onClose={onClose} title="Add to goal" fields={contributionFields}
+        onSubmit={(v) => f.addGoalContribution({ goal: v.goal, account: v.account, amount: Number(v.amount), date: v.date || today })}
       />
     </>
   );
