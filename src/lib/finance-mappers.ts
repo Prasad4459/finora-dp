@@ -21,8 +21,9 @@ import type {
 import type { Account, Asset, Bill, Expense, Goal, Income, Liability } from "@/types/finance";
 
 /* ---------------- dates ---------------- */
-
-export const todayISODate = () => new Date().toISOString().slice(0, 10);
+// All dates are Indian calendar dates (Asia/Kolkata) — see src/lib/date-in.ts.
+export { todayISO as todayISODate } from "@/lib/date-in";
+import { todayISO as todayISODateFn } from "@/lib/date-in";
 
 /** "2026-08-06" -> "06/08/2026" */
 export const isoToDMY = (iso: string | null | undefined) => {
@@ -33,10 +34,10 @@ export const isoToDMY = (iso: string | null | undefined) => {
 
 /** "06/08/2026" (or an ISO string) -> "2026-08-06" */
 export const dmyToISO = (value: string | null | undefined) => {
-  if (!value) return todayISODate();
+  if (!value) return todayISODateFn();
   if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
   const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return todayISODate();
+  if (!m) return todayISODateFn();
   return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 };
 
