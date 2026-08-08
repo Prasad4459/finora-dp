@@ -163,6 +163,11 @@ export function Bills() {
                 const history = paymentsByBill.get(row.id) ?? [];
                 const isOpen = historyFor === row.id;
                 const closed = status === "paid" || status === "cancelled";
+                // One occurrence can only ever be paid once. A recurring bill
+                // rolls forward to a NEW occurrence key, which is payable again.
+                const dueKey = occurrenceKey((row.due_date ?? "").slice(0, 10));
+                const occurrencePaid = history.some((p) => p.period_key === dueKey);
+                const payable = !closed && !occurrencePaid;
                 return (
                   <li key={row.id} className="px-5 py-3">
                     <div className="flex flex-wrap items-center gap-3">
@@ -215,11 +220,16 @@ export function Bills() {
                         <Button
                           size="sm"
                           variant="outline"
-                          disabled={closed || bills.pay.isPending}
-                          onClick={() => setPayTarget(row)}
+                          disabled={!payable || bills.pay.isPending}
+                          title={
+                            occurrencePaid && !closed
+                              ? "This occurrence is already paid"
+                              : undefined
+                          }
+                          onClick={() => payable && setPayTarget(row)}
                         >
                           <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                          {closed ? "Paid" : "Mark paid"}
+                          {closed || occurrencePaid ? "Paid" : "Mark paid"}
                         </Button>
                         <Button
                           size="icon"
