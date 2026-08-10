@@ -13,6 +13,7 @@ import {
   PieChart,
   Receipt,
   LineChart,
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +42,7 @@ const nav = [
   { title: "Goals", url: "/goals", icon: Target },
   { title: "Budget", url: "/budget", icon: PieChart },
   { title: "Bills & Reminders", url: "/bills", icon: Receipt },
+  { title: "What If?", url: "/what-if", icon: Sparkles },
 ] as const;
 
 export function AppSidebar() {
