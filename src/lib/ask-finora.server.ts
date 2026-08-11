@@ -628,6 +628,15 @@ Rules:
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
+/** Title for the invest-more projection. When the additional amount is the full monthly surplus, describe it as such. */
+function investMoreTitle(additionalMonthly: number, s: FinanceSnapshot): string {
+  const total = Math.round(s.monthlyInvestment + additionalMonthly);
+  if (additionalMonthly > 0 && Math.abs(additionalMonthly - s.monthlySurplus) < 0.01) {
+    return `Investing your full monthly surplus of ${money(s.monthlySurplus)} (${money(total)} total monthly investment)`;
+  }
+  return `Investing ${money(additionalMonthly)} more each month`;
+}
+
 export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): string {
   const s = ctx.snapshot;
   const lines: string[] = [];
