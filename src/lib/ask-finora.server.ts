@@ -713,6 +713,8 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
     lines.push(`PROJECTION UNAVAILABLE: ${outcome.blocked} Tell the user you don't have enough information to calculate that yet, and what to record in Finora.`);
   }
 
+  lines.push(...decisionBlocks(outcome));
+
   return lines.join("\n");
 }
 
