@@ -105,7 +105,7 @@ export function requiredMonthlyForTarget(
   if (netWorthAfter(s, months, high, annualReturn) < target) return null;
   for (let i = 0; i < 60; i += 1) {
     const mid = (low + high) / 2;
-    if (netWorthAfter(s, mid, annualReturn === 0 ? 0 : months, annualReturn) >= target) high = mid;
+    if (netWorthAfter(s, months, mid, annualReturn) >= target) high = mid;
     else low = mid;
   }
   return Math.round(high);
