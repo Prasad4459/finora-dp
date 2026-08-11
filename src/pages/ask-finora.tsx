@@ -21,34 +21,108 @@ type Turn = {
   question: string;
   answer?: string;
   projections?: string[];
+  followUps?: string[];
   error?: string;
 };
 
-/** Renders the model's light markdown (**bold**, - bullets) as plain elements. */
+const SECTIONS = [
+  "SUMMARY",
+  "YOUR NUMBERS",
+  "OPTIONS",
+  "PROJECTED IMPACT",
+  "TRADE-OFF",
+  "TRADE OFF",
+  "RECOMMENDATION",
+  "ASSUMPTIONS",
+];
+
+const KIND_STYLE: Record<string, { label: string; badge: string; wrap: string }> = {
+  FACT: {
+    label: "Fact",
+    badge: "bg-muted text-foreground/80",
+    wrap: "border-border bg-muted/30",
+  },
+  PROJECTION: {
+    label: "Projection",
+    badge: "bg-primary text-primary-foreground",
+    wrap: "border-primary/25 bg-primary/[0.06]",
+  },
+  ASSUMPTION: {
+    label: "Assumption",
+    badge: "border border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground",
+    wrap: "border-dashed border-border bg-transparent",
+  },
+  RECOMMENDATION: {
+    label: "Recommendation",
+    badge: "bg-success text-primary-foreground",
+    wrap: "border-success/30 bg-success/[0.08]",
+  },
+};
+
+type Line = { kind: keyof typeof KIND_STYLE | null; text: string };
+type Section = { heading: string | null; lines: Line[] };
+
+const cleanHeading = (raw: string) => (raw === "TRADE OFF" ? "TRADE-OFF" : raw);
+
+function parseAnswer(text: string): Section[] {
+  const sections: Section[] = [];
+  let current: Section = { heading: null, lines: [] };
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const bare = line.replace(/^#+\s*/, "").replace(/\*\*/g, "").replace(/:$/, "").trim();
+    if (SECTIONS.includes(bare.toUpperCase())) {
+      if (current.lines.length) sections.push(current);
+      current = { heading: cleanHeading(bare.toUpperCase()), lines: [] };
+      continue;
+    }
+    const body = line.replace(/^\s*([-*•]|\d+\.)\s+/, "");
+    const match = /^\**(FACT|PROJECTION|ASSUMPTION|RECOMMENDATION)\**\s*[:—-]\s*(.*)$/i.exec(body);
+    current.lines.push(
+      match
+        ? { kind: match[1].toUpperCase() as keyof typeof KIND_STYLE, text: match[2] }
+        : { kind: null, text: body },
+    );
+  }
+  if (current.lines.length) sections.push(current);
+  return sections;
+}
+
+/** Renders the assistant's structured answer with fact/projection/assumption cues. */
 function Answer({ text }: { text: string }) {
-  const blocks = text.split(/\n{2,}/);
+  const sections = parseAnswer(text);
   return (
-    <div className="space-y-3 text-sm leading-relaxed">
-      {blocks.map((block, i) => {
-        const lines = block.split("\n").filter(Boolean);
-        const isList = lines.every((l) => /^\s*([-*•]|\d+\.)\s+/.test(l));
-        if (isList) {
-          return (
-            <ul key={i} className="space-y-1.5 pl-4">
-              {lines.map((l, j) => (
-                <li key={j} className="list-disc marker:text-muted-foreground">
-                  <Inline text={l.replace(/^\s*([-*•]|\d+\.)\s+/, "")} />
-                </li>
-              ))}
-            </ul>
-          );
-        }
-        return (
-          <p key={i}>
-            <Inline text={block.replace(/\n/g, " ")} />
-          </p>
-        );
-      })}
+    <div className="space-y-4 text-sm leading-relaxed">
+      {sections.map((section, i) => (
+        <div key={i} className="space-y-2">
+          {section.heading && (
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {section.heading}
+            </p>
+          )}
+          {section.lines.map((line, j) =>
+            line.kind ? (
+              <div
+                key={j}
+                className={`flex flex-col gap-1 rounded-lg border px-3 py-2 sm:flex-row sm:items-baseline sm:gap-3 ${KIND_STYLE[line.kind].wrap}`}
+              >
+                <span
+                  className={`w-fit shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${KIND_STYLE[line.kind].badge}`}
+                >
+                  {KIND_STYLE[line.kind].label}
+                </span>
+                <span className="min-w-0">
+                  <Inline text={line.text} />
+                </span>
+              </div>
+            ) : (
+              <p key={j} className={section.heading && section.heading !== "SUMMARY" ? "pl-1" : ""}>
+                <Inline text={line.text} />
+              </p>
+            ),
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -76,6 +150,8 @@ export function AskFinora() {
   const [question, setQuestion] = useState("");
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
+  const lastTurn = turns.filter((t) => t.answer).slice(-1)[0];
+  const nextSuggestions = lastTurn?.followUps?.length ? lastTurn.followUps : SUGGESTIONS;
 
   async function send(text: string) {
     const q = text.trim();
@@ -84,11 +160,18 @@ export function AskFinora() {
     setPending(true);
     setQuestion("");
     const id = `${Date.now()}`;
+    // Session-only memory: the last two answered turns travel with the request.
+    const history = turns
+      .filter((t) => t.answer)
+      .slice(-2)
+      .map((t) => ({ question: t.question, answer: t.answer as string }));
     setTurns((prev) => [...prev, { id, question: q }]);
     try {
-      const res = await ask({ data: { question: q } });
+      const res = await ask({ data: { question: q, history } });
       setTurns((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, answer: res.answer, projections: res.projections } : t)),
+        prev.map((t) =>
+          t.id === id ? { ...t, answer: res.answer, projections: res.projections, followUps: res.followUps } : t,
+        ),
       );
     } catch (error) {
       const message =
@@ -203,7 +286,7 @@ export function AskFinora() {
 
       {turns.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
+          {nextSuggestions.map((s) => (
             <Button key={s} variant="ghost" size="sm" onClick={() => send(s)} disabled={pending}>
               {s}
             </Button>

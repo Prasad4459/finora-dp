@@ -35,6 +35,16 @@ import {
   type ScenarioResult,
 } from "@/services/scenario-engine";
 import {
+  assessAffordability,
+  comfortableEmiCeiling,
+  emiForPurchase,
+  runDebtFreeScenario,
+  runTargetReachScenario,
+  type AffordabilityResult,
+  type DebtFreeResult,
+  type TargetReachResult,
+} from "@/services/decision-engine";
+import {
   addMonths,
   currentMonth,
   lastMonths,
@@ -365,19 +375,46 @@ export function parseAmounts(question: string): number[] {
   return out;
 }
 
-export type Intent = "overview" | "improve" | "goal" | "new_emi" | "invest_vs_prepay" | "invest_more" | "net_worth_change" | "general";
+export type Intent =
+  | "target_reach"
+  | "affordability"
+  | "invest_more"
+  | "invest_vs_prepay"
+  | "debt_free"
+  | "financial_health"
+  | "net_worth_change"
+  | "general";
 
 export function detectIntent(question: string): Intent {
   const q = question.toLowerCase();
-  if (/(prepay|pre-pay|pay off|payoff|foreclos)/.test(q) && /(invest|sip|mutual|market)/.test(q)) return "invest_vs_prepay";
-  if (/(emi|afford|loan|car|bike|home loan)/.test(q) && /(afford|emi|take|buy)/.test(q)) return "new_emi";
-  if (/(goal|₹?\s*\d+\s*(l|lakh|cr|crore)\s*(faster|target)?)/.test(q) && /(faster|reach|achieve|sooner|goal)/.test(q)) return "goal";
-  if (/(invest more|increase.*(invest|sip)|extra.*(invest|sip)|start.*sip)/.test(q)) return "invest_more";
+  if (/(prepay|pre-pay|pay off|payoff|foreclos|repay)/.test(q) && /(invest|sip|mutual|market)/.test(q)) {
+    return "invest_vs_prepay";
+  }
+  if (/(debt[- ]?free|clear my loan|clear my debt|pay off my loan|loan free|finish my loan)/.test(q)) return "debt_free";
+  if (/(afford|emi)/.test(q) && /(afford|emi|buy|take|car|bike|house|home|phone|laptop)/.test(q)) return "affordability";
+  if (/(invest|sip|save)/.test(q) && /(more|extra|increase|additional|another)/.test(q)) return "invest_more";
+  if (/(reach|hit|target|corpus|crore|lakh|how fast|when can i|when will i|how much should i invest)/.test(q)) {
+    return "target_reach";
+  }
   if (/(net worth).*(change|drop|fall|grow|increase|decrease)|why.*(net worth)/.test(q)) return "net_worth_change";
-  if (/(improve|better|fix|optimi[sz]e|what should i)/.test(q)) return "improve";
-  if (/(how am i|doing financially|overall|health|position)/.test(q)) return "overview";
+  if (/(how am i|doing financially|health|weakest|improve|better|fix|optimi[sz]e|what should i)/.test(q)) {
+    return "financial_health";
+  }
   return "general";
 }
+
+/** "in 5 years", "within 18 months", "by 3 yrs" -> months. */
+export function parseDeadlineMonths(question: string): number | null {
+  const q = question.toLowerCase();
+  const years = /(\d+(?:\.\d+)?)\s*(years?|yrs?|yr)\b/.exec(q);
+  if (years) return Math.round(Number(years[1]) * 12);
+  const months = /(\d+)\s*(months?|mos?)\b/.exec(q);
+  if (months) return Number(months[1]);
+  return null;
+}
+
+/** Does the question name an amount as a monthly figure? */
+const looksMonthly = (q: string) => /(per month|a month|monthly|every month|\/month|p\.?m\.?|emi)/i.test(q);
 
 /** Loan principal that produces this EMI — derived with the engine's own emiFor. */
 function principalForEmi(emi: number, rate: number, tenure: number): number {
@@ -399,6 +436,10 @@ export type Projection = {
 
 export type ScenarioOutcome = {
   projections: Projection[];
+  /** Target-reach calculation (engine-composed), when the question names a target. */
+  target?: TargetReachResult & { hypothetical: boolean; matchedGoal?: string };
+  affordability?: AffordabilityResult;
+  debtFree?: DebtFreeResult;
   /** Set when a scenario was clearly asked for but cannot be computed. */
   blocked?: string;
 };
@@ -411,13 +452,23 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
   const projections: Projection[] = [];
 
   const noHistory = s.monthsOfHistory === 0 || (s.monthlyIncome === 0 && s.monthlyExpenses === 0);
+  const monthlyish = looksMonthly(question);
 
   try {
-    if (intent === "new_emi") {
-      const emi = amounts.find((a) => a >= 1000 && a <= 500000);
-      if (!emi) return { projections, blocked: "No EMI amount was given, so the New EMI scenario could not be run." };
+    if (intent === "affordability") {
+      // "₹40,000 EMI" is a monthly figure; "a ₹20L car" is a purchase price.
+      const named = amounts.find((a) => a >= 1000);
+      if (!named) return { projections, blocked: "No amount was given, so affordability could not be assessed." };
       if (noHistory) return { projections, blocked: "There is no recorded income or spending history yet, so affordability cannot be projected." };
-      const principal = principalForEmi(emi, DEFAULT_LOAN_RATE, DEFAULT_TENURE);
+      const isPrice = !monthlyish && named >= 300000;
+      const emi = isPrice ? emiForPurchase(named, DEFAULT_LOAN_RATE, DEFAULT_TENURE) : named;
+      const principal = isPrice ? named : principalForEmi(emi, DEFAULT_LOAN_RATE, DEFAULT_TENURE);
+      const affordability = assessAffordability(s, {
+        emi,
+        ...(isPrice ? { purchaseAmount: named } : {}),
+        annualRate: DEFAULT_LOAN_RATE,
+        tenureMonths: DEFAULT_TENURE,
+      });
       projections.push({
         kind: "new_emi",
         title: `New EMI of ₹${emi.toLocaleString("en-IN")}`,
@@ -435,6 +486,7 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
           from,
         ),
       });
+      return { projections, affordability };
     } else if (intent === "invest_vs_prepay") {
       const amount = amounts.find((a) => a >= 1000);
       const liability = s.liabilities.slice().sort((a, b) => b.balance - a.balance)[0];
@@ -443,7 +495,33 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
       const result = runInvestVsPrepayScenario(s, { liabilityId: liability.id, amount, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from);
       if (!result) return { projections, blocked: "The prepayment comparison could not be calculated for the recorded loans." };
       projections.push({ kind: "invest_vs_prepay", title: `₹${amount.toLocaleString("en-IN")} — invest vs prepay ${liability.name}`, result });
-    } else if (intent === "goal" || intent === "invest_more") {
+      return { projections, debtFree: runDebtFreeScenario(s, from) };
+    } else if (intent === "debt_free") {
+      if (s.liabilities.length === 0) {
+        return { projections, blocked: "No open loans are recorded, so there is no debt timeline to project." };
+      }
+      return { projections, debtFree: runDebtFreeScenario(s, from) };
+    } else if (intent === "target_reach") {
+      if (noHistory) return { projections, blocked: "There is no recorded income or spending history yet, so a target timeline cannot be projected." };
+      const target = amounts.filter((a) => a >= 100000).sort((a, b) => b - a)[0];
+      if (!target) return { projections, blocked: "No target amount was given, so a target timeline could not be projected." };
+      const deadlineMonths = parseDeadlineMonths(question);
+      const matched = s.goals.find((g) => Math.abs(g.target - target) <= Math.max(1000, target * 0.02));
+      const reach = runTargetReachScenario(s, { target, annualReturn: DEFAULT_RETURN, deadlineMonths }, from);
+      // Also show the standard What-If comparison for the first accelerated path.
+      const step = reach.paths.find((p) => p.additionalMonthly > 0);
+      if (step) {
+        projections.push({
+          kind: "invest_more",
+          title: `Investing ₹${step.additionalMonthly.toLocaleString("en-IN")} more each month`,
+          result: runInvestMoreScenario(s, { additionalMonthly: step.additionalMonthly, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
+        });
+      }
+      return {
+        projections,
+        target: { ...reach, hypothetical: !matched, ...(matched ? { matchedGoal: matched.name } : {}) },
+      };
+    } else if (intent === "invest_more") {
       if (noHistory) return { projections, blocked: "There is no recorded income or spending history yet, so goal timelines cannot be projected." };
       const extra = amounts.find((a) => a >= 500 && a <= 500000) ?? Math.max(1000, Math.round(Math.max(0, s.monthlySurplus) * 0.25));
       projections.push({
@@ -451,12 +529,55 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
         title: `Investing ₹${extra.toLocaleString("en-IN")} more each month`,
         result: runInvestMoreScenario(s, { additionalMonthly: extra, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
       });
+    } else if (intent === "financial_health" && s.liabilities.length > 0) {
+      return { projections, debtFree: runDebtFreeScenario(s, from) };
     }
   } catch (error) {
     return { projections: [], blocked: `The scenario engine could not complete this calculation (${(error as Error).message}).` };
   }
 
   return { projections };
+}
+
+/* ------------------------------------------------------------------ */
+/* Suggested follow-ups (deterministic, engine-backed)                 */
+/* ------------------------------------------------------------------ */
+
+const money0 = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+export function followUpsFor(intent: Intent, ctx: AskContext, outcome: ScenarioOutcome): string[] {
+  const s = ctx.snapshot;
+  const out: string[] = [];
+  if (outcome.target) {
+    const t = outcome.target;
+    out.push("What if I invest ₹10,000 more per month?");
+    out.push(`What if I target ${money0(t.target)} in 5 years?`);
+    out.push(`How much should I invest monthly to reach ${money0(t.target)} in 5 years?`);
+  } else if (outcome.affordability) {
+    const ceiling = comfortableEmiCeiling(s);
+    out.push("What EMI can I comfortably afford?");
+    if (ceiling > 0) out.push(`What if I choose a ${money0(ceiling)} EMI?`);
+    if (s.goals[0]) out.push(`How will this affect my ${s.goals[0].name} goal?`);
+    else out.push("When will I become debt free?");
+  } else if (intent === "invest_vs_prepay") {
+    out.push("What if I invest ₹1L instead?");
+    out.push("How quickly can I become debt free?");
+    out.push("What if I invest ₹20,000 more every month?");
+  } else if (intent === "debt_free") {
+    out.push("Should I invest ₹2L or prepay my loan?");
+    out.push("What if I pay ₹10,000 more towards my loan every month?");
+    out.push("How am I doing financially?");
+  } else if (intent === "invest_more") {
+    out.push("How can I reach ₹1 crore?");
+    out.push("When will I become debt free?");
+    out.push("What is my weakest financial area?");
+  } else {
+    out.push("How can I reach ₹50L?");
+    if (s.liabilities.length > 0) out.push("When will I become debt free?");
+    out.push("What if I invest ₹10,000 more every month?");
+    out.push("Can I afford a ₹40,000 car EMI?");
+  }
+  return out.slice(0, 3);
 }
 
 /** Current-path goal timelines — engine output, used for planning answers. */
@@ -474,24 +595,35 @@ export function goalTimelines(ctx: AskContext) {
 /* Prompting                                                           */
 /* ------------------------------------------------------------------ */
 
-export const SYSTEM_PROMPT = `You are Ask Finora, the financial copilot inside Finora, a personal finance app for people in India.
+export const SYSTEM_PROMPT = `You are Ask Finora, the financial decision assistant inside Finora, a personal finance app for people in India.
 
-You explain and interpret figures that have ALREADY been calculated for you. You must never calculate, estimate or invent a financial number yourself.
-- Every rupee figure you state must appear in the CONTEXT block.
-- If a number the user needs is not in the context, say plainly: "I don't have enough information to calculate that yet." and say what they would need to record in Finora.
+You explain and interpret figures that have ALREADY been calculated for you by Finora's deterministic engines. You must never calculate, estimate or invent a financial number yourself.
+- Every rupee figure, month count or date you state must appear in the CONTEXT block.
+- If a number the user needs is not in the context, say plainly that you can't calculate that reliably yet, and say what they would need to record in Finora. Never guess.
 - Amounts are Indian rupees; format them like ₹1,20,000.
 
-Label your statements so the user can tell them apart. Use these labels inline, in bold:
-- **FACT** — a value taken from the user's actual Finora data.
-- **PROJECTION** — a figure produced by the What-If scenario engine (given in the context under PROJECTIONS).
-- **ASSUMPTION** — an input the projection relies on, e.g. an expected return rate.
-- **RECOMMENDATION** — your interpretation and suggested next step.
+ANSWER FORMAT — reply using only these section headings, each on its own line, in this order, omitting any section that has nothing useful to say:
+SUMMARY
+YOUR NUMBERS
+OPTIONS
+PROJECTED IMPACT
+TRADE-OFF
+RECOMMENDATION
+ASSUMPTIONS
+
+Under a heading, write short bullet lines starting with "- ". Where the line is one of the four kinds below, start it with the matching prefix followed by a colon:
+- "FACT:" — a value taken from the user's actual Finora data.
+- "PROJECTION:" — a figure produced by Finora's engines (PROJECTIONS / TARGET / AFFORDABILITY / DEBT sections of the context).
+- "ASSUMPTION:" — an input a projection relies on, e.g. an assumed return rate.
+- "RECOMMENDATION:" — your measured interpretation and suggested next step.
+Use each prefix at most once per line, never in the middle of a sentence, and never invent other prefixes. SUMMARY is plain prose of one or two sentences with no prefix.
 
 Rules:
-- Never present a projection as guaranteed. Investment returns are assumptions.
-- Be concise: short paragraphs or tight bullets, no filler, no greetings, no markdown tables.
-- Be specific to this user's data. Never give generic advice that their numbers do not support.
-- You cannot perform any action. Never offer to add, edit or delete anything. When the user should act, point them to the relevant Finora page, e.g. "you can add that from Investments" / "Goals" / "Bills & Reminders" / "What If?".
+- Never present a projection as guaranteed. Prefer "under these assumptions, X is projected to ..." over "X will ...".
+- Never over-recommend. Do not write "definitely", "absolutely", "you should certainly", or promise wealth. Present the trade-off honestly, including risk, liquidity and the certainty of interest saved versus the uncertainty of investment returns.
+- If the context says a target is hypothetical, say so explicitly in the SUMMARY, e.g. "I'll treat ₹50L as a hypothetical target because you haven't created a matching goal."
+- Be concise — aim for under 250 words. No filler, no greetings, no markdown tables, no headings other than the ones listed.
+- You cannot perform any action. Never offer to add, edit or delete anything. When the user should act, point them to the relevant Finora page: Investments, Goals, Liabilities, Bills & Reminders or What If?.
 - No tax advice, no product or fund recommendations, no market predictions.`;
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -581,7 +713,82 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
     lines.push(`PROJECTION UNAVAILABLE: ${outcome.blocked} Tell the user you don't have enough information to calculate that yet, and what to record in Finora.`);
   }
 
+  lines.push(...decisionBlocks(outcome));
+
   return lines.join("\n");
+}
+
+/** Appends the Release 6 decision blocks. Called from buildContextBlock. */
+function decisionBlocks(outcome: ScenarioOutcome): string[] {
+  const lines: string[] = [];
+
+  if (outcome.target) {
+    const t = outcome.target;
+    lines.push("");
+    lines.push("TARGET REACH — calculated by Finora's engine. Quote these exactly:");
+    lines.push(`- Target: ${money(t.target)}${t.hypothetical ? " (HYPOTHETICAL — the user has no matching goal in Finora; say this explicitly)" : ` (matches the existing goal "${t.matchedGoal}")`}`);
+    lines.push(`- Current net worth: ${money(t.currentNetWorth)}; gap to target: ${money(t.gap)}`);
+    for (const p of t.paths) {
+      const when = p.months === null ? "not reached within 50 years" : `~${p.months} months, around ${p.reachedBy}`;
+      lines.push(
+        `- ${p.label}: ${when}; total monthly investing ${money(p.totalMonthlyInvestment)}; monthly surplus left ${money(p.monthlySurplusAfter)}${p.affordable ? "" : " (MORE than the current surplus — not affordable today)"}`,
+      );
+    }
+    if (t.deadline) {
+      lines.push(
+        t.deadline.additionalMonthly === null
+          ? `- Deadline of ${t.deadline.months} months: not reachable within a realistic monthly investment, so no required amount can be given.`
+          : `- To reach the target in ${t.deadline.months} months: invest about ${money(t.deadline.additionalMonthly)} more each month (total ${money(t.deadline.totalMonthly ?? 0)} a month)${t.deadline.reachableWithCurrentSurplus ? "" : " — this is MORE than the current monthly surplus"}.`,
+      );
+    }
+    for (const n of t.notes) lines.push(`- Note: ${n}`);
+    lines.push("ASSUMPTIONS behind this target calculation:");
+    for (const a of t.assumptions) lines.push(`- ${a.label}: ${a.value}`);
+  }
+
+  if (outcome.affordability) {
+    const a = outcome.affordability;
+    lines.push("");
+    lines.push("AFFORDABILITY — calculated by Finora's engine:");
+    if (a.purchaseAmount !== undefined) lines.push(`- Purchase price considered: ${money(a.purchaseAmount)}, implying an EMI of ${money(a.emi)}`);
+    lines.push(`- Proposed EMI: ${money(a.emi)}; existing EMI commitments: ${money(a.existingEmi)}`);
+    lines.push(`- Current monthly surplus: ${money(a.currentSurplus)}; surplus after this EMI: ${money(a.surplusAfter)}`);
+    if (a.emiToIncomeRatio !== null) lines.push(`- This EMI is ${a.emiToIncomeRatio}% of average monthly income; all EMIs together would be ${a.totalEmiToIncomeRatio}%`);
+    lines.push(`- VERDICT: ${a.status}`);
+    for (const r of a.reasons) lines.push(`- Reason: ${r}`);
+    lines.push("ASSUMPTIONS behind this affordability check:");
+    for (const x of a.assumptions) lines.push(`- ${x.label}: ${x.value}`);
+  }
+
+  if (outcome.debtFree) {
+    const d = outcome.debtFree;
+    lines.push("");
+    lines.push("DEBT TIMELINE — calculated by Finora's engine:");
+    lines.push(`- Total outstanding debt: ${money(d.totalDebt)}; monthly EMI: ${money(d.monthlyEmi)}`);
+    lines.push(
+      d.debtFreeMonths === null
+        ? "- Debt-free date: cannot be projected from the recorded loans."
+        : `- Projected debt free in ~${d.debtFreeMonths} months, around ${d.debtFreeBy}`,
+    );
+    for (const l of d.lines) {
+      lines.push(
+        `- ${l.name}: ${money(l.balance)} at ${l.rateKnown ? `${l.rate}%` : "an UNKNOWN interest rate"}, EMI ${money(l.emi)}, ${l.payoffMonths === null ? "payoff not projectable" : `clears in ~${l.payoffMonths} months (${l.payoffBy})`}${l.rateKnown ? `, total interest ${money(l.totalInterest)}` : ""}`,
+      );
+    }
+    if (d.highestCost) lines.push(`- Highest-cost debt: ${d.highestCost}`);
+    if (d.surplusPrepay) {
+      const p = d.surplusPrepay;
+      lines.push(
+        `- If the whole monthly surplus of ${money(p.monthlyExtra)} went to that loan: ${p.payoffMonths === null ? "still not cleared within 50 years" : `it clears in ~${p.payoffMonths} months`}${p.monthsSaved ? `, about ${p.monthsSaved} months sooner` : ""}, saving about ${money(p.interestSaved)} of interest.`,
+      );
+    }
+    for (const n of d.notes) lines.push(`- Note: ${n}`);
+    lines.push("- Do not recommend prepayment purely because debt exists: weigh the interest rate, the emergency runway, liquidity and cash flow.");
+    lines.push("ASSUMPTIONS behind this debt timeline:");
+    for (const x of d.assumptions) lines.push(`- ${x.label}: ${x.value}`);
+  }
+
+  return lines;
 }
 
 /* ------------------------------------------------------------------ */
@@ -590,9 +797,21 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
 
 const MODEL = "google/gemini-3.5-flash";
 
-export async function askGateway(question: string, contextBlock: string): Promise<string> {
+/** Immediately preceding turns of this page session (never persisted). */
+export type ChatTurn = { question: string; answer: string };
+
+export async function askGateway(
+  question: string,
+  contextBlock: string,
+  history: ChatTurn[] = [],
+): Promise<string> {
   const apiKey = process.env['LOVABLE_API_KEY'];
   if (!apiKey) throw new Error("AI is not configured for this project.");
+
+  const priorMessages = history.slice(-2).flatMap((turn) => [
+    { role: "user", content: turn.question },
+    { role: "assistant", content: turn.answer.slice(0, 2000) },
+  ]);
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -605,6 +824,7 @@ export async function askGateway(question: string, contextBlock: string): Promis
       model: MODEL,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
+        ...priorMessages,
         { role: "user", content: `CONTEXT\n${contextBlock}\n\nQUESTION\n${question}` },
       ],
     }),
