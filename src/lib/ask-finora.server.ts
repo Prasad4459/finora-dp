@@ -35,6 +35,16 @@ import {
   type ScenarioResult,
 } from "@/services/scenario-engine";
 import {
+  assessAffordability,
+  comfortableEmiCeiling,
+  emiForPurchase,
+  runDebtFreeScenario,
+  runTargetReachScenario,
+  type AffordabilityResult,
+  type DebtFreeResult,
+  type TargetReachResult,
+} from "@/services/decision-engine";
+import {
   addMonths,
   currentMonth,
   lastMonths,
