@@ -513,7 +513,7 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
       if (step) {
         projections.push({
           kind: "invest_more",
-          title: `Investing ₹${step.additionalMonthly.toLocaleString("en-IN")} more each month`,
+          title: investMoreTitle(step.additionalMonthly, s),
           result: runInvestMoreScenario(s, { additionalMonthly: step.additionalMonthly, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
         });
       }
@@ -526,7 +526,7 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
       const extra = amounts.find((a) => a >= 500 && a <= 500000) ?? Math.max(1000, Math.round(Math.max(0, s.monthlySurplus) * 0.25));
       projections.push({
         kind: "invest_more",
-        title: `Investing ₹${extra.toLocaleString("en-IN")} more each month`,
+        title: investMoreTitle(extra, s),
         result: runInvestMoreScenario(s, { additionalMonthly: extra, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
       });
     } else if (intent === "financial_health" && s.liabilities.length > 0) {
@@ -627,6 +627,15 @@ Rules:
 - No tax advice, no product or fund recommendations, no market predictions.`;
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+/** Title for the invest-more projection. When the additional amount is the full monthly surplus, describe it as such. */
+function investMoreTitle(additionalMonthly: number, s: FinanceSnapshot): string {
+  const total = Math.round(s.monthlyInvestment + additionalMonthly);
+  if (additionalMonthly > 0 && Math.abs(additionalMonthly - s.monthlySurplus) < 0.01) {
+    return `Investing your full monthly surplus of ${money(s.monthlySurplus)} (${money(total)} total monthly investment)`;
+  }
+  return `Investing ${money(additionalMonthly)} more each month`;
+}
 
 export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): string {
   const s = ctx.snapshot;
