@@ -39,23 +39,23 @@ const SECTIONS = [
 const KIND_STYLE: Record<string, { label: string; badge: string; wrap: string }> = {
   FACT: {
     label: "Fact",
-    badge: "bg-primary/10 text-primary",
-    wrap: "border-primary/25 bg-primary/[0.04]",
+    badge: "bg-muted text-foreground/80",
+    wrap: "border-border bg-muted/30",
   },
   PROJECTION: {
     label: "Projection",
-    badge: "bg-accent/15 text-accent-foreground",
-    wrap: "border-accent/30 bg-accent/[0.06]",
+    badge: "bg-primary text-primary-foreground",
+    wrap: "border-primary/25 bg-primary/[0.06]",
   },
   ASSUMPTION: {
     label: "Assumption",
-    badge: "bg-muted text-muted-foreground",
-    wrap: "border-border bg-muted/40",
+    badge: "border border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground",
+    wrap: "border-dashed border-border bg-transparent",
   },
   RECOMMENDATION: {
     label: "Recommendation",
-    badge: "bg-secondary text-secondary-foreground",
-    wrap: "border-secondary bg-secondary/40",
+    badge: "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950",
+    wrap: "border-emerald-600/30 bg-emerald-600/[0.07]",
   },
 };
 
