@@ -735,11 +735,16 @@ function decisionBlocks(outcome: ScenarioOutcome): string[] {
       );
     }
     if (t.deadline) {
-      lines.push(
-        t.deadline.additionalMonthly === null
-          ? `- Deadline of ${t.deadline.months} months: not reachable within a realistic monthly investment, so no required amount can be given.`
-          : `- To reach the target in ${t.deadline.months} months: invest about ${money(t.deadline.additionalMonthly)} more each month (total ${money(t.deadline.totalMonthly ?? 0)} a month)${t.deadline.reachableWithCurrentSurplus ? "" : " — this is MORE than the current monthly surplus"}.`,
-      );
+      const d = t.deadline;
+      if (d.additionalMonthly === null) {
+        lines.push(
+          `- Deadline of ${d.months} months: NOT AFFORDABLE. Even investing every rupee of the current monthly surplus (total ${money(d.maxAffordableMonthly)} a month), the projection reaches only ${money(d.bestCaseNetWorth)} — a shortfall of ${money(d.shortfall)}. Say clearly that this target is not reachable in ${d.months} months on the current income and spending, and that it needs a longer horizon, a higher surplus or a smaller target.`,
+        );
+      } else {
+        lines.push(
+          `- To reach the target in ${d.months} months: invest ${money(d.totalMonthly ?? 0)} a month in total, which is ${money(d.additionalMonthly)} MORE than the ${money(t.currentNetWorth >= 0 ? 0 : 0)}existing monthly investing. Verified: feeding that amount back through the projection engine gives ${money(d.verifiedNetWorth ?? 0)} after ${d.months} months. This fits inside the current monthly surplus.`,
+        );
+      }
     }
     for (const n of t.notes) lines.push(`- Note: ${n}`);
     lines.push("ASSUMPTIONS behind this target calculation:");
