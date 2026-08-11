@@ -511,11 +511,11 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
       // Also show the standard What-If comparison for the first accelerated path.
       const step = reach.paths.find((p) => p.additionalMonthly > 0);
       if (step) {
-        projections.push({
-          kind: "invest_more",
-          title: `Investing ₹${step.additionalMonthly.toLocaleString("en-IN")} more each month`,
-          result: runInvestMoreScenario(s, { additionalMonthly: step.additionalMonthly, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
-        });
+      projections.push({
+        kind: "invest_more",
+        title: investMoreTitle(step.additionalMonthly, s),
+        result: runInvestMoreScenario(s, { additionalMonthly: step.additionalMonthly, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
+      });
       }
       return {
         projections,
