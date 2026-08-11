@@ -375,19 +375,46 @@ export function parseAmounts(question: string): number[] {
   return out;
 }
 
-export type Intent = "overview" | "improve" | "goal" | "new_emi" | "invest_vs_prepay" | "invest_more" | "net_worth_change" | "general";
+export type Intent =
+  | "target_reach"
+  | "affordability"
+  | "invest_more"
+  | "invest_vs_prepay"
+  | "debt_free"
+  | "financial_health"
+  | "net_worth_change"
+  | "general";
 
 export function detectIntent(question: string): Intent {
   const q = question.toLowerCase();
-  if (/(prepay|pre-pay|pay off|payoff|foreclos)/.test(q) && /(invest|sip|mutual|market)/.test(q)) return "invest_vs_prepay";
-  if (/(emi|afford|loan|car|bike|home loan)/.test(q) && /(afford|emi|take|buy)/.test(q)) return "new_emi";
-  if (/(goal|₹?\s*\d+\s*(l|lakh|cr|crore)\s*(faster|target)?)/.test(q) && /(faster|reach|achieve|sooner|goal)/.test(q)) return "goal";
-  if (/(invest more|increase.*(invest|sip)|extra.*(invest|sip)|start.*sip)/.test(q)) return "invest_more";
+  if (/(prepay|pre-pay|pay off|payoff|foreclos|repay)/.test(q) && /(invest|sip|mutual|market)/.test(q)) {
+    return "invest_vs_prepay";
+  }
+  if (/(debt[- ]?free|clear my loan|clear my debt|pay off my loan|loan free|finish my loan)/.test(q)) return "debt_free";
+  if (/(afford|emi)/.test(q) && /(afford|emi|buy|take|car|bike|house|home|phone|laptop)/.test(q)) return "affordability";
+  if (/(invest|sip|save)/.test(q) && /(more|extra|increase|additional|another)/.test(q)) return "invest_more";
+  if (/(reach|hit|target|corpus|crore|lakh|how fast|when can i|when will i|how much should i invest)/.test(q)) {
+    return "target_reach";
+  }
   if (/(net worth).*(change|drop|fall|grow|increase|decrease)|why.*(net worth)/.test(q)) return "net_worth_change";
-  if (/(improve|better|fix|optimi[sz]e|what should i)/.test(q)) return "improve";
-  if (/(how am i|doing financially|overall|health|position)/.test(q)) return "overview";
+  if (/(how am i|doing financially|health|weakest|improve|better|fix|optimi[sz]e|what should i)/.test(q)) {
+    return "financial_health";
+  }
   return "general";
 }
+
+/** "in 5 years", "within 18 months", "by 3 yrs" -> months. */
+export function parseDeadlineMonths(question: string): number | null {
+  const q = question.toLowerCase();
+  const years = /(\d+(?:\.\d+)?)\s*(years?|yrs?|yr)\b/.exec(q);
+  if (years) return Math.round(Number(years[1]) * 12);
+  const months = /(\d+)\s*(months?|mos?)\b/.exec(q);
+  if (months) return Number(months[1]);
+  return null;
+}
+
+/** Does the question name an amount as a monthly figure? */
+const looksMonthly = (q: string) => /(per month|a month|monthly|every month|\/month|p\.?m\.?|emi)/i.test(q);
 
 /** Loan principal that produces this EMI — derived with the engine's own emiFor. */
 function principalForEmi(emi: number, rate: number, tenure: number): number {
