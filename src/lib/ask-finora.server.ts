@@ -742,7 +742,7 @@ function decisionBlocks(outcome: ScenarioOutcome): string[] {
         );
       } else {
         lines.push(
-          `- To reach the target in ${d.months} months: invest ${money(d.totalMonthly ?? 0)} a month in total, which is ${money(d.additionalMonthly)} MORE than the ${money(t.currentNetWorth >= 0 ? 0 : 0)}existing monthly investing. Verified: feeding that amount back through the projection engine gives ${money(d.verifiedNetWorth ?? 0)} after ${d.months} months. This fits inside the current monthly surplus.`,
+          `- To reach the target in ${d.months} months: invest ${money(d.totalMonthly ?? 0)} a month in total, which is ${money(d.additionalMonthly)} MORE than the existing monthly investing. Verified: feeding that amount back through the projection engine gives ${money(d.verifiedNetWorth ?? 0)} after ${d.months} months. This fits inside the current monthly surplus.`,
         );
       }
     }
