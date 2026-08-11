@@ -91,18 +91,29 @@ export function monthsToTarget(
   return low;
 }
 
-/** Extra monthly investment needed to hit `target` within `months`. */
+/**
+ * Extra monthly investment needed to hit `target` within `months`.
+ *
+ * The search is capped at `maxAdditional` (defaults to the current monthly
+ * surplus): investing more than the surplus would mean funding contributions
+ * from money the user does not have, which drives projected cash negative and
+ * produces a mathematically valid but financially meaningless answer.
+ * Returns null when the target is unreachable within that cap.
+ */
 export function requiredMonthlyForTarget(
   s: FinanceSnapshot,
   target: number,
   months: number,
   annualReturn: number,
+  maxAdditional?: number,
 ): number | null {
   if (months <= 0) return null;
   if (netWorthAfter(s, months, 0, annualReturn) >= target) return 0;
+  const cap = Math.max(0, maxAdditional ?? projectCashFlow(s).surplus);
+  if (cap <= 0) return null;
+  if (netWorthAfter(s, months, cap, annualReturn) < target) return null;
   let low = 0;
-  let high = Math.max(10000, target / months) * 4;
-  if (netWorthAfter(s, months, high, annualReturn) < target) return null;
+  let high = cap;
   for (let i = 0; i < 60; i += 1) {
     const mid = (low + high) / 2;
     if (netWorthAfter(s, months, mid, annualReturn) >= target) high = mid;
