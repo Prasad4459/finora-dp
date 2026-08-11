@@ -21,6 +21,7 @@ type Turn = {
   question: string;
   answer?: string;
   projections?: string[];
+  followUps?: string[];
   error?: string;
 };
 
