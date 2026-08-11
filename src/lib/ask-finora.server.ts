@@ -436,6 +436,10 @@ export type Projection = {
 
 export type ScenarioOutcome = {
   projections: Projection[];
+  /** Target-reach calculation (engine-composed), when the question names a target. */
+  target?: TargetReachResult & { hypothetical: boolean; matchedGoal?: string };
+  affordability?: AffordabilityResult;
+  debtFree?: DebtFreeResult;
   /** Set when a scenario was clearly asked for but cannot be computed. */
   blocked?: string;
 };
@@ -448,13 +452,23 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
   const projections: Projection[] = [];
 
   const noHistory = s.monthsOfHistory === 0 || (s.monthlyIncome === 0 && s.monthlyExpenses === 0);
+  const monthlyish = looksMonthly(question);
 
   try {
-    if (intent === "new_emi") {
-      const emi = amounts.find((a) => a >= 1000 && a <= 500000);
-      if (!emi) return { projections, blocked: "No EMI amount was given, so the New EMI scenario could not be run." };
+    if (intent === "affordability") {
+      // "₹40,000 EMI" is a monthly figure; "a ₹20L car" is a purchase price.
+      const named = amounts.find((a) => a >= 1000);
+      if (!named) return { projections, blocked: "No amount was given, so affordability could not be assessed." };
       if (noHistory) return { projections, blocked: "There is no recorded income or spending history yet, so affordability cannot be projected." };
-      const principal = principalForEmi(emi, DEFAULT_LOAN_RATE, DEFAULT_TENURE);
+      const isPrice = !monthlyish && named >= 300000;
+      const emi = isPrice ? emiForPurchase(named, DEFAULT_LOAN_RATE, DEFAULT_TENURE) : named;
+      const principal = isPrice ? named : principalForEmi(emi, DEFAULT_LOAN_RATE, DEFAULT_TENURE);
+      const affordability = assessAffordability(s, {
+        emi,
+        ...(isPrice ? { purchaseAmount: named } : {}),
+        annualRate: DEFAULT_LOAN_RATE,
+        tenureMonths: DEFAULT_TENURE,
+      });
       projections.push({
         kind: "new_emi",
         title: `New EMI of ₹${emi.toLocaleString("en-IN")}`,
@@ -472,6 +486,7 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
           from,
         ),
       });
+      return { projections, affordability };
     } else if (intent === "invest_vs_prepay") {
       const amount = amounts.find((a) => a >= 1000);
       const liability = s.liabilities.slice().sort((a, b) => b.balance - a.balance)[0];
@@ -480,7 +495,33 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
       const result = runInvestVsPrepayScenario(s, { liabilityId: liability.id, amount, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from);
       if (!result) return { projections, blocked: "The prepayment comparison could not be calculated for the recorded loans." };
       projections.push({ kind: "invest_vs_prepay", title: `₹${amount.toLocaleString("en-IN")} — invest vs prepay ${liability.name}`, result });
-    } else if (intent === "goal" || intent === "invest_more") {
+      return { projections, debtFree: runDebtFreeScenario(s, from) };
+    } else if (intent === "debt_free") {
+      if (s.liabilities.length === 0) {
+        return { projections, blocked: "No open loans are recorded, so there is no debt timeline to project." };
+      }
+      return { projections, debtFree: runDebtFreeScenario(s, from) };
+    } else if (intent === "target_reach") {
+      if (noHistory) return { projections, blocked: "There is no recorded income or spending history yet, so a target timeline cannot be projected." };
+      const target = amounts.filter((a) => a >= 100000).sort((a, b) => b - a)[0];
+      if (!target) return { projections, blocked: "No target amount was given, so a target timeline could not be projected." };
+      const deadlineMonths = parseDeadlineMonths(question);
+      const matched = s.goals.find((g) => Math.abs(g.target - target) <= Math.max(1000, target * 0.02));
+      const reach = runTargetReachScenario(s, { target, annualReturn: DEFAULT_RETURN, deadlineMonths }, from);
+      // Also show the standard What-If comparison for the first accelerated path.
+      const step = reach.paths.find((p) => p.additionalMonthly > 0);
+      if (step) {
+        projections.push({
+          kind: "invest_more",
+          title: `Investing ₹${step.additionalMonthly.toLocaleString("en-IN")} more each month`,
+          result: runInvestMoreScenario(s, { additionalMonthly: step.additionalMonthly, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
+        });
+      }
+      return {
+        projections,
+        target: { ...reach, hypothetical: !matched, ...(matched ? { matchedGoal: matched.name } : {}) },
+      };
+    } else if (intent === "invest_more") {
       if (noHistory) return { projections, blocked: "There is no recorded income or spending history yet, so goal timelines cannot be projected." };
       const extra = amounts.find((a) => a >= 500 && a <= 500000) ?? Math.max(1000, Math.round(Math.max(0, s.monthlySurplus) * 0.25));
       projections.push({
@@ -488,12 +529,55 @@ export function runScenariosFor(question: string, intent: Intent, ctx: AskContex
         title: `Investing ₹${extra.toLocaleString("en-IN")} more each month`,
         result: runInvestMoreScenario(s, { additionalMonthly: extra, expectedReturn: DEFAULT_RETURN, years: DEFAULT_YEARS }, from),
       });
+    } else if (intent === "financial_health" && s.liabilities.length > 0) {
+      return { projections, debtFree: runDebtFreeScenario(s, from) };
     }
   } catch (error) {
     return { projections: [], blocked: `The scenario engine could not complete this calculation (${(error as Error).message}).` };
   }
 
   return { projections };
+}
+
+/* ------------------------------------------------------------------ */
+/* Suggested follow-ups (deterministic, engine-backed)                 */
+/* ------------------------------------------------------------------ */
+
+const money0 = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+export function followUpsFor(intent: Intent, ctx: AskContext, outcome: ScenarioOutcome): string[] {
+  const s = ctx.snapshot;
+  const out: string[] = [];
+  if (outcome.target) {
+    const t = outcome.target;
+    out.push("What if I invest ₹10,000 more per month?");
+    out.push(`What if I target ${money0(t.target)} in 5 years?`);
+    out.push(`How much should I invest monthly to reach ${money0(t.target)} in 5 years?`);
+  } else if (outcome.affordability) {
+    const ceiling = comfortableEmiCeiling(s);
+    out.push("What EMI can I comfortably afford?");
+    if (ceiling > 0) out.push(`What if I choose a ${money0(ceiling)} EMI?`);
+    if (s.goals[0]) out.push(`How will this affect my ${s.goals[0].name} goal?`);
+    else out.push("When will I become debt free?");
+  } else if (intent === "invest_vs_prepay") {
+    out.push("What if I invest ₹1L instead?");
+    out.push("How quickly can I become debt free?");
+    out.push("What if I invest ₹20,000 more every month?");
+  } else if (intent === "debt_free") {
+    out.push("Should I invest ₹2L or prepay my loan?");
+    out.push("What if I pay ₹10,000 more towards my loan every month?");
+    out.push("How am I doing financially?");
+  } else if (intent === "invest_more") {
+    out.push("How can I reach ₹1 crore?");
+    out.push("When will I become debt free?");
+    out.push("What is my weakest financial area?");
+  } else {
+    out.push("How can I reach ₹50L?");
+    if (s.liabilities.length > 0) out.push("When will I become debt free?");
+    out.push("What if I invest ₹10,000 more every month?");
+    out.push("Can I afford a ₹40,000 car EMI?");
+  }
+  return out.slice(0, 3);
 }
 
 /** Current-path goal timelines — engine output, used for planning answers. */
