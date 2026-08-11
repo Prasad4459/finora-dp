@@ -14,6 +14,7 @@ import {
   Receipt,
   LineChart,
   Sparkles,
+  MessageCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,7 @@ const nav = [
   { title: "Budget", url: "/budget", icon: PieChart },
   { title: "Bills & Reminders", url: "/bills", icon: Receipt },
   { title: "What If?", url: "/what-if", icon: Sparkles },
+  { title: "Ask Finora", url: "/ask-finora", icon: MessageCircle },
 ] as const;
 
 export function AppSidebar() {
