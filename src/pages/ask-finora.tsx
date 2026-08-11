@@ -150,6 +150,8 @@ export function AskFinora() {
   const [question, setQuestion] = useState("");
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
+  const lastTurn = turns.filter((t) => t.answer).slice(-1)[0];
+  const nextSuggestions = lastTurn?.followUps?.length ? lastTurn.followUps : SUGGESTIONS;
 
   async function send(text: string) {
     const q = text.trim();
@@ -158,11 +160,18 @@ export function AskFinora() {
     setPending(true);
     setQuestion("");
     const id = `${Date.now()}`;
+    // Session-only memory: the last two answered turns travel with the request.
+    const history = turns
+      .filter((t) => t.answer)
+      .slice(-2)
+      .map((t) => ({ question: t.question, answer: t.answer as string }));
     setTurns((prev) => [...prev, { id, question: q }]);
     try {
-      const res = await ask({ data: { question: q } });
+      const res = await ask({ data: { question: q, history } });
       setTurns((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, answer: res.answer, projections: res.projections } : t)),
+        prev.map((t) =>
+          t.id === id ? { ...t, answer: res.answer, projections: res.projections, followUps: res.followUps } : t,
+        ),
       );
     } catch (error) {
       const message =
@@ -277,7 +286,7 @@ export function AskFinora() {
 
       {turns.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
+          {nextSuggestions.map((s) => (
             <Button key={s} variant="ghost" size="sm" onClick={() => send(s)} disabled={pending}>
               {s}
             </Button>
