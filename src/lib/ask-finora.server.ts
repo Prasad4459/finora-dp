@@ -797,9 +797,21 @@ function decisionBlocks(outcome: ScenarioOutcome): string[] {
 
 const MODEL = "google/gemini-3.5-flash";
 
-export async function askGateway(question: string, contextBlock: string): Promise<string> {
+/** Immediately preceding turns of this page session (never persisted). */
+export type ChatTurn = { question: string; answer: string };
+
+export async function askGateway(
+  question: string,
+  contextBlock: string,
+  history: ChatTurn[] = [],
+): Promise<string> {
   const apiKey = process.env['LOVABLE_API_KEY'];
   if (!apiKey) throw new Error("AI is not configured for this project.");
+
+  const priorMessages = history.slice(-2).flatMap((turn) => [
+    { role: "user", content: turn.question },
+    { role: "assistant", content: turn.answer.slice(0, 2000) },
+  ]);
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -812,6 +824,7 @@ export async function askGateway(question: string, contextBlock: string): Promis
       model: MODEL,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
+        ...priorMessages,
         { role: "user", content: `CONTEXT\n${contextBlock}\n\nQUESTION\n${question}` },
       ],
     }),
