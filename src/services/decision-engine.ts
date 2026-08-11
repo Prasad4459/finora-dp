@@ -67,6 +67,14 @@ export type TargetReachResult = {
     additionalMonthly: number | null;
     totalMonthly: number | null;
     reachableWithCurrentSurplus: boolean;
+    /** Everything the user could invest: existing investing + full surplus. */
+    maxAffordableMonthly: number;
+    /** Net worth at the deadline if every rupee of surplus were invested. */
+    bestCaseNetWorth: number;
+    /** Gap that remains in the best case (0 when the target is reachable). */
+    shortfall: number;
+    /** Net worth the returned plan actually projects to — verification. */
+    verifiedNetWorth: number | null;
   };
   assumptions: Array<{ label: string; value: string }>;
   notes: string[];
@@ -91,18 +99,29 @@ export function monthsToTarget(
   return low;
 }
 
-/** Extra monthly investment needed to hit `target` within `months`. */
+/**
+ * Extra monthly investment needed to hit `target` within `months`.
+ *
+ * The search is capped at `maxAdditional` (defaults to the current monthly
+ * surplus): investing more than the surplus would mean funding contributions
+ * from money the user does not have, which drives projected cash negative and
+ * produces a mathematically valid but financially meaningless answer.
+ * Returns null when the target is unreachable within that cap.
+ */
 export function requiredMonthlyForTarget(
   s: FinanceSnapshot,
   target: number,
   months: number,
   annualReturn: number,
+  maxAdditional?: number,
 ): number | null {
   if (months <= 0) return null;
   if (netWorthAfter(s, months, 0, annualReturn) >= target) return 0;
+  const cap = Math.max(0, maxAdditional ?? projectCashFlow(s).surplus);
+  if (cap <= 0) return null;
+  if (netWorthAfter(s, months, cap, annualReturn) < target) return null;
   let low = 0;
-  let high = Math.max(10000, target / months) * 4;
-  if (netWorthAfter(s, months, high, annualReturn) < target) return null;
+  let high = cap;
   for (let i = 0; i < 60; i += 1) {
     const mid = (low + high) / 2;
     if (netWorthAfter(s, months, mid, annualReturn) >= target) high = mid;
@@ -168,13 +187,25 @@ export function runTargetReachScenario(
   };
 
   if (input.deadlineMonths && input.deadlineMonths > 0) {
-    const additional = requiredMonthlyForTarget(s, input.target, input.deadlineMonths, input.annualReturn);
+    const cap = Math.max(0, surplus);
+    const additional = requiredMonthlyForTarget(s, input.target, input.deadlineMonths, input.annualReturn, cap);
+    const bestCase = netWorthAfter(s, input.deadlineMonths, cap, input.annualReturn);
     result.deadline = {
       months: input.deadlineMonths,
       additionalMonthly: additional,
       totalMonthly: additional === null ? null : round(s.monthlyInvestment + additional),
-      reachableWithCurrentSurplus: additional !== null && additional <= surplus,
+      reachableWithCurrentSurplus: additional !== null,
+      maxAffordableMonthly: round(s.monthlyInvestment + cap),
+      bestCaseNetWorth: round(bestCase),
+      shortfall: round(Math.max(0, input.target - bestCase)),
+      verifiedNetWorth:
+        additional === null ? null : round(netWorthAfter(s, input.deadlineMonths, additional, input.annualReturn)),
     };
+    if (additional === null) {
+      result.notes.push(
+        `Even investing the entire monthly surplus of ${inr(cap)} on top of existing investing, the projection reaches ${inr(bestCase)} in ${input.deadlineMonths} months — short of ${inr(input.target)}. This deadline is not affordable today.`,
+      );
+    }
   }
 
   return result;
