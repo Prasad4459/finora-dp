@@ -201,6 +201,11 @@ export function runTargetReachScenario(
       verifiedNetWorth:
         additional === null ? null : round(netWorthAfter(s, input.deadlineMonths, additional, input.annualReturn)),
     };
+    if (additional === null) {
+      result.notes.push(
+        `Even investing the entire monthly surplus of ${inr(cap)} on top of existing investing, the projection reaches ${inr(bestCase)} in ${input.deadlineMonths} months — short of ${inr(input.target)}. This deadline is not affordable today.`,
+      );
+    }
   }
 
   return result;
