@@ -716,6 +716,79 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
   return lines.join("\n");
 }
 
+/** Appends the Release 6 decision blocks. Called from buildContextBlock. */
+function decisionBlocks(outcome: ScenarioOutcome): string[] {
+  const lines: string[] = [];
+
+  if (outcome.target) {
+    const t = outcome.target;
+    lines.push("");
+    lines.push("TARGET REACH — calculated by Finora's engine. Quote these exactly:");
+    lines.push(`- Target: ${money(t.target)}${t.hypothetical ? " (HYPOTHETICAL — the user has no matching goal in Finora; say this explicitly)" : ` (matches the existing goal "${t.matchedGoal}")`}`);
+    lines.push(`- Current net worth: ${money(t.currentNetWorth)}; gap to target: ${money(t.gap)}`);
+    for (const p of t.paths) {
+      const when = p.months === null ? "not reached within 50 years" : `~${p.months} months, around ${p.reachedBy}`;
+      lines.push(
+        `- ${p.label}: ${when}; total monthly investing ${money(p.totalMonthlyInvestment)}; monthly surplus left ${money(p.monthlySurplusAfter)}${p.affordable ? "" : " (MORE than the current surplus — not affordable today)"}`,
+      );
+    }
+    if (t.deadline) {
+      lines.push(
+        t.deadline.additionalMonthly === null
+          ? `- Deadline of ${t.deadline.months} months: not reachable within a realistic monthly investment, so no required amount can be given.`
+          : `- To reach the target in ${t.deadline.months} months: invest about ${money(t.deadline.additionalMonthly)} more each month (total ${money(t.deadline.totalMonthly ?? 0)} a month)${t.deadline.reachableWithCurrentSurplus ? "" : " — this is MORE than the current monthly surplus"}.`,
+      );
+    }
+    for (const n of t.notes) lines.push(`- Note: ${n}`);
+    lines.push("ASSUMPTIONS behind this target calculation:");
+    for (const a of t.assumptions) lines.push(`- ${a.label}: ${a.value}`);
+  }
+
+  if (outcome.affordability) {
+    const a = outcome.affordability;
+    lines.push("");
+    lines.push("AFFORDABILITY — calculated by Finora's engine:");
+    if (a.purchaseAmount !== undefined) lines.push(`- Purchase price considered: ${money(a.purchaseAmount)}, implying an EMI of ${money(a.emi)}`);
+    lines.push(`- Proposed EMI: ${money(a.emi)}; existing EMI commitments: ${money(a.existingEmi)}`);
+    lines.push(`- Current monthly surplus: ${money(a.currentSurplus)}; surplus after this EMI: ${money(a.surplusAfter)}`);
+    if (a.emiToIncomeRatio !== null) lines.push(`- This EMI is ${a.emiToIncomeRatio}% of average monthly income; all EMIs together would be ${a.totalEmiToIncomeRatio}%`);
+    lines.push(`- VERDICT: ${a.status}`);
+    for (const r of a.reasons) lines.push(`- Reason: ${r}`);
+    lines.push("ASSUMPTIONS behind this affordability check:");
+    for (const x of a.assumptions) lines.push(`- ${x.label}: ${x.value}`);
+  }
+
+  if (outcome.debtFree) {
+    const d = outcome.debtFree;
+    lines.push("");
+    lines.push("DEBT TIMELINE — calculated by Finora's engine:");
+    lines.push(`- Total outstanding debt: ${money(d.totalDebt)}; monthly EMI: ${money(d.monthlyEmi)}`);
+    lines.push(
+      d.debtFreeMonths === null
+        ? "- Debt-free date: cannot be projected from the recorded loans."
+        : `- Projected debt free in ~${d.debtFreeMonths} months, around ${d.debtFreeBy}`,
+    );
+    for (const l of d.lines) {
+      lines.push(
+        `- ${l.name}: ${money(l.balance)} at ${l.rateKnown ? `${l.rate}%` : "an UNKNOWN interest rate"}, EMI ${money(l.emi)}, ${l.payoffMonths === null ? "payoff not projectable" : `clears in ~${l.payoffMonths} months (${l.payoffBy})`}${l.rateKnown ? `, total interest ${money(l.totalInterest)}` : ""}`,
+      );
+    }
+    if (d.highestCost) lines.push(`- Highest-cost debt: ${d.highestCost}`);
+    if (d.surplusPrepay) {
+      const p = d.surplusPrepay;
+      lines.push(
+        `- If the whole monthly surplus of ${money(p.monthlyExtra)} went to that loan: ${p.payoffMonths === null ? "still not cleared within 50 years" : `it clears in ~${p.payoffMonths} months`}${p.monthsSaved ? `, about ${p.monthsSaved} months sooner` : ""}, saving about ${money(p.interestSaved)} of interest.`,
+      );
+    }
+    for (const n of d.notes) lines.push(`- Note: ${n}`);
+    lines.push("- Do not recommend prepayment purely because debt exists: weigh the interest rate, the emergency runway, liquidity and cash flow.");
+    lines.push("ASSUMPTIONS behind this debt timeline:");
+    for (const x of d.assumptions) lines.push(`- ${x.label}: ${x.value}`);
+  }
+
+  return lines;
+}
+
 /* ------------------------------------------------------------------ */
 /* AI call                                                             */
 /* ------------------------------------------------------------------ */
