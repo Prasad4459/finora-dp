@@ -54,8 +54,8 @@ const KIND_STYLE: Record<string, { label: string; badge: string; wrap: string }>
   },
   RECOMMENDATION: {
     label: "Recommendation",
-    badge: "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950",
-    wrap: "border-emerald-600/30 bg-emerald-600/[0.07]",
+    badge: "bg-success text-primary-foreground",
+    wrap: "border-success/30 bg-success/[0.08]",
   },
 };
 
