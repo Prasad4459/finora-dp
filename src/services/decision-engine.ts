@@ -67,6 +67,14 @@ export type TargetReachResult = {
     additionalMonthly: number | null;
     totalMonthly: number | null;
     reachableWithCurrentSurplus: boolean;
+    /** Everything the user could invest: existing investing + full surplus. */
+    maxAffordableMonthly: number;
+    /** Net worth at the deadline if every rupee of surplus were invested. */
+    bestCaseNetWorth: number;
+    /** Gap that remains in the best case (0 when the target is reachable). */
+    shortfall: number;
+    /** Net worth the returned plan actually projects to — verification. */
+    verifiedNetWorth: number | null;
   };
   assumptions: Array<{ label: string; value: string }>;
   notes: string[];
@@ -179,12 +187,19 @@ export function runTargetReachScenario(
   };
 
   if (input.deadlineMonths && input.deadlineMonths > 0) {
-    const additional = requiredMonthlyForTarget(s, input.target, input.deadlineMonths, input.annualReturn);
+    const cap = Math.max(0, surplus);
+    const additional = requiredMonthlyForTarget(s, input.target, input.deadlineMonths, input.annualReturn, cap);
+    const bestCase = netWorthAfter(s, input.deadlineMonths, cap, input.annualReturn);
     result.deadline = {
       months: input.deadlineMonths,
       additionalMonthly: additional,
       totalMonthly: additional === null ? null : round(s.monthlyInvestment + additional),
-      reachableWithCurrentSurplus: additional !== null && additional <= surplus,
+      reachableWithCurrentSurplus: additional !== null,
+      maxAffordableMonthly: round(s.monthlyInvestment + cap),
+      bestCaseNetWorth: round(bestCase),
+      shortfall: round(Math.max(0, input.target - bestCase)),
+      verifiedNetWorth:
+        additional === null ? null : round(netWorthAfter(s, input.deadlineMonths, additional, input.annualReturn)),
     };
   }
 
