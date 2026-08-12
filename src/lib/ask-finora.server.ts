@@ -54,6 +54,12 @@ import {
   todayISO,
   type MonthRef,
 } from "@/lib/date-in";
+import {
+  buildMarketContext,
+  type MarketContext,
+  type ValuationPoint,
+} from "@/services/market-context";
+import type { Asset } from "@/types/finance";
 
 type Db = SupabaseClient<Database>;
 
@@ -122,6 +128,21 @@ export type AskContext = {
   bills: Array<{ name: string; amount: number; due: string }>;
   contributions: Array<{ name: string; amount: number; frequency: string; nextDue: string }>;
   topCategories: Array<{ name: string; spent: number }>;
+  /** Market-valued holdings + valuation history (Release 7D). */
+  market: MarketContext;
+  /** Recorded activity for today (IST), by ledger type. Aggregates only. */
+  today: {
+    date: string;
+    income: number;
+    dividend: number;
+    refund: number;
+    expense: number;
+    investment: number;
+    redemption: number;
+    emi: number;
+    transfer: number;
+    count: number;
+  };
   hasData: boolean;
 };
 
@@ -158,10 +179,14 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
   const today = todayISO();
   const horizon = monthRange(addMonths(current, 1)).to;
 
-  const [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes] =
+  const [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes, valuationsRes, todayRes] =
     await Promise.all([
       supabase.from("wallets").select("name, type, balance, is_active"),
-      supabase.from("assets").select("name, type, current_value, is_active"),
+      supabase
+        .from("assets")
+        .select(
+          "id, name, type, purchase_value, current_value, quantity, units, avg_cost, last_price, last_price_at, interest_rate, compounding, maturity_date, purchase_date, created_at, symbol, exchange, price_source, price_unit, institution, is_active",
+        ),
       supabase
         .from("liabilities")
         .select("id, name, type, outstanding_balance, interest_rate, emi_amount, remaining_months, status"),
@@ -185,9 +210,15 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
         .limit(20),
       supabase.rpc("tx_summary_monthly", { _from: from, _to: to }),
       supabase.rpc("tx_category_monthly", { _from: monthRange(current).from, _to: to }),
+      supabase
+        .from("asset_valuations")
+        .select("asset_id, as_of, value")
+        .order("as_of", { ascending: false })
+        .limit(400),
+      supabase.from("transactions").select("type, amount").eq("transaction_date", today),
     ]);
 
-  const firstError = [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes]
+  const firstError = [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes, valuationsRes, todayRes]
     .map((r) => r.error)
     .find(Boolean);
   if (firstError) throw new Error(`[ask-finora] ${firstError.message}`);
@@ -205,16 +236,58 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
       updated: "",
     }));
 
-  const assets = (assetsRes.data ?? [])
+  // Full asset shape so valuation uses the SAME assetCurrentValue() path as the
+  // Investments page (units × NAV for market assets, accrual for deposits).
+  const assets: Asset[] = (assetsRes.data ?? [])
     .filter((a) => a.is_active !== false)
-    .map((a) => ({
-      id: "",
-      name: a.name,
-      type: ASSET_LABEL[a.type] ?? "Other",
-      purchase: 0,
-      current: num(a.current_value),
-      date: "",
-    }));
+    .map((a) => {
+      const x = a as Record<string, unknown>;
+      const opt = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+      return {
+        id: String(x['id'] ?? ""),
+        name: a.name,
+        type: ASSET_LABEL[a.type] ?? "Other",
+        purchase: num(x['purchase_value']),
+        current: num(a.current_value),
+        date: String(x['purchase_date'] ?? x['created_at'] ?? today).slice(0, 10),
+        units: opt(x['units'] ?? x['quantity']),
+        avgCost: opt(x['avg_cost']),
+        lastPrice: opt(x['last_price']),
+        rate: opt(x['interest_rate']),
+        compounding: (x['compounding'] as string | null) ?? null,
+        maturityDate: (x['maturity_date'] as string | null) ?? null,
+        institution: (x['institution'] as string | null) ?? null,
+        symbol: (x['symbol'] as string | null) ?? null,
+        exchange: (x['exchange'] as string | null) ?? null,
+        priceSource: (x['price_source'] as string | null) ?? "manual",
+        priceUnit: (x['price_unit'] as string | null) ?? "per_unit",
+        lastPriceAt: (x['last_price_at'] as string | null) ?? null,
+        isActive: true,
+      } satisfies Asset;
+    });
+
+  const valuations: ValuationPoint[] = (valuationsRes.data ?? []).map((v) => ({
+    assetId: String((v as Record<string, unknown>)['asset_id'] ?? ""),
+    asOf: String((v as Record<string, unknown>)['as_of'] ?? "").slice(0, 10),
+    value: num((v as Record<string, unknown>)['value']),
+  }));
+  const market = buildMarketContext(assets, valuations, today);
+
+  const todayRows = (todayRes.data ?? []) as Array<{ type: string; amount: unknown }>;
+  const sumToday = (type: string) =>
+    Math.round(todayRows.filter((r) => r.type === type).reduce((s, r) => s + num(r.amount), 0));
+  const todayActivity = {
+    date: today,
+    income: sumToday("income"),
+    dividend: sumToday("dividend"),
+    refund: sumToday("refund"),
+    expense: sumToday("expense"),
+    investment: sumToday("investment"),
+    redemption: sumToday("redemption"),
+    emi: sumToday("emi"),
+    transfer: sumToday("transfer"),
+    count: todayRows.length,
+  };
 
   const liabilities = (liabRes.data ?? [])
     .filter((l) => l.status !== "closed")
@@ -337,6 +410,8 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
     bills,
     contributions,
     topCategories,
+    market,
+    today: todayActivity,
     hasData:
       accounts.length > 0 ||
       assets.length > 0 ||
@@ -383,10 +458,25 @@ export type Intent =
   | "debt_free"
   | "financial_health"
   | "net_worth_change"
+  | "market_performance"
+  | "earned_today"
   | "general";
 
 export function detectIntent(question: string): Intent {
   const q = question.toLowerCase();
+  // Release 7D — factual market questions come first: they must never be
+  // rerouted into a What-If projection.
+  if (/(net worth).*(change|drop|fall|grow|increase|decrease)|why.*(net worth)/.test(q)) return "net_worth_change";
+  if (/(earn|make|made|gain|profit|income).*(today)|today.*(earn|make|made|gain|profit)/.test(q)) {
+    return /(invest|portfolio|mutual|fund|stock|etf|gold|market|nav)/.test(q) ? "market_performance" : "earned_today";
+  }
+  if (
+    /(mutual fund|mutual funds|portfolio|holding|nav|market value|unrealised|unrealized)/.test(q) ||
+    (/(invest|investment|investments|stock|stocks|etf|gold|crypto)/.test(q) &&
+      /(gain|gained|lose|lost|loss|return|returns|worth|value|perform|performed|performance|\bup\b|\bdown\b|profit|changed|change)/.test(q))
+  ) {
+    return "market_performance";
+  }
   if (/(prepay|pre-pay|pay off|payoff|foreclos|repay)/.test(q) && /(invest|sip|mutual|market)/.test(q)) {
     return "invest_vs_prepay";
   }
@@ -396,7 +486,6 @@ export function detectIntent(question: string): Intent {
   if (/(reach|hit|target|corpus|crore|lakh|how fast|when can i|when will i|how much should i invest)/.test(q)) {
     return "target_reach";
   }
-  if (/(net worth).*(change|drop|fall|grow|increase|decrease)|why.*(net worth)/.test(q)) return "net_worth_change";
   if (/(how am i|doing financially|health|weakest|improve|better|fix|optimi[sz]e|what should i)/.test(q)) {
     return "financial_health";
   }
@@ -571,6 +660,11 @@ export function followUpsFor(intent: Intent, ctx: AskContext, outcome: ScenarioO
     out.push("How can I reach ₹1 crore?");
     out.push("When will I become debt free?");
     out.push("What is my weakest financial area?");
+  } else if (intent === "market_performance" || intent === "earned_today" || intent === "net_worth_change") {
+    out.push("What is my total unrealised gain?");
+    if (ctx.market.holdings.length > 1) out.push("Which investment performed best?");
+    else out.push("Why did my net worth change?");
+    out.push("What if I invest ₹10,000 more every month?");
   } else {
     out.push("How can I reach ₹50L?");
     if (s.liabilities.length > 0) out.push("When will I become debt free?");
@@ -613,10 +707,22 @@ ASSUMPTIONS
 
 Under a heading, write short bullet lines starting with "- ". Where the line is one of the four kinds below, start it with the matching prefix followed by a colon:
 - "FACT:" — a value taken from the user's actual Finora data.
+- "MARKET CHANGE:" — a change in value caused by a recorded market price/NAV, taken from the MARKET INVESTMENTS block.
+- "UNREALISED GAIN:" — current market value minus invested amount, for a holding or the portfolio. Not cash, not income.
+- "TRANSACTION:" — money actually recorded as moving (income, expense, contribution, redemption, EMI, transfer).
 - "PROJECTION:" — a figure produced by Finora's engines (PROJECTIONS / TARGET / AFFORDABILITY / DEBT sections of the context).
 - "ASSUMPTION:" — an input a projection relies on, e.g. an assumed return rate.
 - "RECOMMENDATION:" — your measured interpretation and suggested next step.
 Use each prefix at most once per line, never in the middle of a sentence, and never invent other prefixes. SUMMARY is plain prose of one or two sentences with no prefix.
+
+MARKET AWARENESS — three different kinds of change; never mix them up:
+1. TRANSACTION / cash change: money actually deposited, spent, invested, redeemed or transferred. Only ever from the TODAY'S RECORDED ACTIVITY, RECENT MONTHS or FACTS blocks.
+2. MARKET VALUATION change: value moved because the recorded price/NAV changed. Only ever from the MARKET INVESTMENTS block.
+3. INCOME: salary, interest, dividends or other recorded income rows.
+- Never call a market valuation increase "income", "earnings" or "cash". Never call an investment contribution "profit" or "returns".
+- Only state a market valuation change when the context gives one. If the context says the change is NOT AVAILABLE, say: "Current market value is ₹X, but I don't yet have a previous valuation to calculate today's change." Never invent a previous price or a market return.
+- For "why did my net worth change?", explain using the components present in the context — wallet/cash movement, income, expenses, investment contributions, redemptions, market valuation change and liability changes — and never attribute a market-driven change to a transaction that did not occur.
+- For simple factual market questions (current value, unrealised gain, best performer, today's change), answer with SUMMARY and YOUR NUMBERS only. Do not force OPTIONS, PROJECTED IMPACT, TRADE-OFF or ASSUMPTIONS sections when no projection was run.
 
 Rules:
 - Never present a projection as guaranteed. Prefer "under these assumptions, X is projected to ..." over "X will ...".
@@ -638,6 +744,72 @@ function investMoreTitle(additionalMonthly: number, s: FinanceSnapshot): string 
 }
 
 export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): string {
+  return buildContextLines(ctx, outcome).join("\n");
+}
+
+/** MARKET INVESTMENTS block — valuation facts only, never projections. */
+function marketBlock(ctx: AskContext): string[] {
+  const mkt = ctx.market;
+  const lines: string[] = [];
+  if (!mkt.hasMarketData) {
+    lines.push("");
+    lines.push(
+      "MARKET INVESTMENTS: none recorded. There are no market-valued holdings (stocks, mutual funds, ETFs, gold), so there is no market valuation or unrealised gain to report.",
+    );
+    return lines;
+  }
+  lines.push("");
+  lines.push(
+    "MARKET INVESTMENTS — valuation FACTS from this user's own holdings. These are UNREALISED market values, not income and not cash:",
+  );
+  lines.push(
+    `- Portfolio: invested ${money(mkt.invested)}, current market value ${money(mkt.value)}, unrealised gain/loss ${money(mkt.gain)} (${mkt.gainPct}%)`,
+  );
+  lines.push(
+    mkt.valuationChange === null
+      ? "- Market valuation change: NOT AVAILABLE — no holding has two recorded valuations yet, so the change since a previous valuation cannot be calculated. Never invent a previous price."
+      : `- Market valuation change since the previous recorded valuation: ${money(mkt.valuationChange)}${mkt.valuationChangeToday === null ? " (the latest valuations were NOT recorded today, so do NOT call this today's change)" : ` (of which ${money(mkt.valuationChangeToday)} comes from valuations recorded today)`}`,
+  );
+  for (const h of mkt.holdings) {
+    const id = [h.symbol ? `code ${h.symbol}` : null, h.exchange, `price source ${h.priceSource}`]
+      .filter(Boolean)
+      .join(", ");
+    lines.push(
+      `- ${h.name} (${h.type}${id ? `, ${id}` : ""}): ${h.units ?? "unknown"} units at ${h.price === null ? "no recorded price" : money(h.price)} per unit = current value ${money(h.value)}; invested ${money(h.invested)}; unrealised gain/loss ${money(h.gain)} (${h.gainPct}%)${h.lastPriceAt ? `; price last updated ${h.lastPriceAt.slice(0, 10)}` : "; price never updated"}`,
+    );
+    if (h.valuationChange === null) {
+      lines.push(
+        `  - Valuation history: ${h.latestValuationDate ? `only one valuation (${h.latestValuationDate}, ${money(h.latestValuationValue ?? 0)})` : "no recorded valuations"}. Say: current market value is ${money(h.value)}, but there is no previous valuation yet to calculate the change.`,
+      );
+    } else {
+      lines.push(
+        `  - Valuation history: ${h.previousValuationDate} ${money(h.previousValuationValue ?? 0)} -> ${h.latestValuationDate} ${money(h.latestValuationValue ?? 0)}; market valuation change ${money(h.valuationChange)}${h.changeIsToday ? " (latest valuation was recorded today)" : " (the latest valuation was NOT recorded today — describe it as the change between those two dates)"}`,
+      );
+    }
+  }
+  if (mkt.best) lines.push(`- Best performer by unrealised return: ${mkt.best.name} (${mkt.best.gainPct}%)`);
+  if (mkt.worst) lines.push(`- Weakest performer by unrealised return: ${mkt.worst.name} (${mkt.worst.gainPct}%)`);
+  return lines;
+}
+
+/** TODAY block — recorded ledger activity for the IST day, aggregates only. */
+function todayBlock(ctx: AskContext): string[] {
+  const t = ctx.today;
+  const lines = ["", `TODAY'S RECORDED ACTIVITY (${t.date}, Asia/Kolkata) — TRANSACTIONS, not market movement:`];
+  if (t.count === 0) {
+    lines.push("- No transactions were recorded today: income ₹0, expenses ₹0, investment contributions ₹0.");
+  } else {
+    lines.push(`- Income ${money(t.income)}; dividends ${money(t.dividend)}; refunds ${money(t.refund)}`);
+    lines.push(`- Expenses ${money(t.expense)}; EMI ${money(t.emi)}; transfers ${money(t.transfer)}`);
+    lines.push(`- Investment contributions ${money(t.investment)}; redemptions ${money(t.redemption)}`);
+  }
+  lines.push(
+    "- Investment contributions are money MOVED into investments, never profit. Market valuation change is NOT income and NOT a transaction.",
+  );
+  return lines;
+}
+
+function buildContextLines(ctx: AskContext, outcome: ScenarioOutcome): string[] {
   const s = ctx.snapshot;
   const lines: string[] = [];
 
@@ -667,6 +839,9 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
     lines.push("TOP SPENDING CATEGORIES THIS MONTH:");
     for (const c of ctx.topCategories) lines.push(`- ${c.name}: ${money(c.spent)}`);
   }
+
+  lines.push(...marketBlock(ctx));
+  lines.push(...todayBlock(ctx));
 
   if (s.liabilities.length) {
     lines.push("");
@@ -724,7 +899,7 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
 
   lines.push(...decisionBlocks(outcome));
 
-  return lines.join("\n");
+  return lines;
 }
 
 /** Appends the Release 6 decision blocks. Called from buildContextBlock. */

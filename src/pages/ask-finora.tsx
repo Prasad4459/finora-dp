@@ -42,6 +42,21 @@ const KIND_STYLE: Record<string, { label: string; badge: string; wrap: string }>
     badge: "bg-muted text-foreground/80",
     wrap: "border-border bg-muted/30",
   },
+  "MARKET CHANGE": {
+    label: "Market change",
+    badge: "bg-accent text-accent-foreground",
+    wrap: "border-accent/30 bg-accent/[0.08]",
+  },
+  "UNREALISED GAIN": {
+    label: "Unrealised gain",
+    badge: "bg-success/15 text-success",
+    wrap: "border-success/25 bg-success/[0.05]",
+  },
+  TRANSACTION: {
+    label: "Transaction",
+    badge: "bg-secondary text-secondary-foreground",
+    wrap: "border-border bg-secondary/30",
+  },
   PROJECTION: {
     label: "Projection",
     badge: "bg-primary text-primary-foreground",
@@ -77,10 +92,16 @@ function parseAnswer(text: string): Section[] {
       continue;
     }
     const body = line.replace(/^\s*([-*•]|\d+\.)\s+/, "");
-    const match = /^\**(FACT|PROJECTION|ASSUMPTION|RECOMMENDATION)\**\s*[:—-]\s*(.*)$/i.exec(body);
+    const match =
+      /^\**(MARKET CHANGE|UNREALIS[EZ]D GAIN|TRANSACTION|FACT|PROJECTION|ASSUMPTION|RECOMMENDATION)\**\s*[:—-]\s*(.*)$/i.exec(
+        body,
+      );
     current.lines.push(
       match
-        ? { kind: match[1].toUpperCase() as keyof typeof KIND_STYLE, text: match[2] }
+        ? {
+            kind: match[1].toUpperCase().replace("UNREALIZED", "UNREALISED") as keyof typeof KIND_STYLE,
+            text: match[2],
+          }
         : { kind: null, text: body },
     );
   }
