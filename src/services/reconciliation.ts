@@ -133,7 +133,7 @@ export function reconcileNetWorth(input: ReconciliationInput): Reconciliation {
   const marketUnavailable = input.marketChange === null;
   const market = input.marketChange ?? 0;
 
-  const components: ReconciliationComponent[] = [
+  const rawComponents: ReconciliationComponent[] = [
     {
       key: "income",
       label: "Recorded income",
@@ -178,7 +178,11 @@ export function reconcileNetWorth(input: ReconciliationInput): Reconciliation {
       effect: other,
       note: "Any identified revaluation of assets or liabilities outside the ledger.",
     },
-  ].map((c) => ({ ...c, effect: r2(c.effect) }));
+  ];
+  const components: ReconciliationComponent[] = rawComponents.map((c) => ({
+    ...c,
+    effect: r2(c.effect),
+  }));
 
   const neutralMovements: NeutralMovement[] = [
     {
