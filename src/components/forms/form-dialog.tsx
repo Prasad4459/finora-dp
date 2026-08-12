@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 type Common = {
   showWhen?: (values: Record<string, string | boolean>) => boolean;
   hint?: string;
+  /** Value-aware label (e.g. "Grams held" for per-gram instruments). */
+  dynamicLabel?: (values: Record<string, string | boolean>) => string;
   /** Shown under the field when it is required but empty on submit. */
   requiredMessage?: string;
 };
@@ -122,7 +124,7 @@ export function FormDialog({
           {visible.map((f) => (
             <Field
               key={f.key}
-              label={f.label}
+              label={f.dynamicLabel ? f.dynamicLabel(values) : f.label}
               error={showErrors && isMissing(f) ? (f.requiredMessage ?? `${f.label} is required`) : null}
             >
               {f.type === "select" ? (

@@ -23,7 +23,7 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { useFinanceSummary, type FinanceSummary } from "@/hooks/use-finance-summary";
 import { computeTotals, type FinanceTotals } from "@/services/finance";
 import { frequencyFromLabel, nextDueDate } from "@/services/bills";
-import { instrumentMeta } from "@/services/instruments";
+import { instrumentMeta, instrumentPriceUnit } from "@/services/instruments";
 import { useBillReminders } from "@/hooks/use-bill-reminders";
 import { currentMonth, monthLongLabel, todayISO, type MonthRef } from "@/lib/date-in";
 import {
@@ -418,7 +418,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     symbol: v.symbol || null,
     exchange: v.exchange || null,
     price_source: v.priceSource || "manual",
-    price_unit: v.priceUnit || (instrumentMeta(v.type).assetClass === "gold" ? "per_gram" : "per_unit"),
+    // Price unit is a property of the INSTRUMENT (gold/silver in grams, funds
+    // and ETFs in units) — never of the broader asset class.
+    price_unit: instrumentPriceUnit(v.type),
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,
