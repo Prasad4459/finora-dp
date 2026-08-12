@@ -228,7 +228,11 @@ export function EntityDialogs({
       dynamicHint: (v) =>
         String(v.priceSource ?? "") === "gold_inr"
           ? "24K reference valuation: grams × 24K gold price per gram. Excludes making charges, GST and dealer spreads."
-          : "Only AMFI / NSE / BSE holdings are refreshed automatically.",
+          : String(v.type ?? "") === "Sovereign Gold Bond"
+            ? "No verified SGB price feed is available, so SGBs stay manual: enter the traded price per unit yourself. The 2.5% annual coupon is separate — record each payout as income."
+            : String(v.type ?? "") === "Silver"
+              ? "Silver has no verified price feed — update the price per gram manually."
+              : "Only AMFI / NSE / BSE holdings are refreshed automatically.",
       showWhen: shows("priceSource"),
     },
     purchase: { key: "purchase", label: "Invested amount (₹)", type: "number", required: true, showWhen: shows("purchase") },
@@ -255,7 +259,9 @@ export function EntityDialogs({
       dynamicHint: (v) =>
         instrumentPriceUnit(String(v.type ?? "")) === "per_gram"
           ? "Per gram, not the total value. Current value = grams × this price (24K reference)."
-          : "Per unit, not the total value. Current value = units × this price.",
+          : String(v.type ?? "") === "Sovereign Gold Bond"
+            ? "Per bond unit, not the total value. No verified SGB price feed exists, so enter the traded price yourself. The 2.5% annual coupon is separate — record each payout as income."
+            : "Per unit, not the total value. Current value = units × this price.",
       showWhen: shows("lastPrice"),
     },
     current: { key: "current", label: "Current value (₹)", type: "number", required: true, showWhen: shows("current") },
