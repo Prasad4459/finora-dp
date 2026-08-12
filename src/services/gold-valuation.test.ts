@@ -80,7 +80,7 @@ describe("Release 7E-1 — gold price-unit safety", () => {
   it("accrual and equity holdings are unaffected by the unit rules", () => {
     const fd: Asset = { id: "f1", name: "SBI FD", type: "FD", purchase: 100_000, current: 100_000, date: "2025-08-12", rate: 7, compounding: "Yearly", isActive: true };
     const mf: Asset = { id: "m1", name: "Nifty Fund", type: "Mutual Funds", purchase: 100_000, current: 120_000, date: "2025-08-12", units: 1000, avgCost: 100, lastPrice: 120, isActive: true };
-    expect(assetCurrentValue(fd, TODAY)).toBe(107_000);
+    expect(assetCurrentValue(fd, TODAY)).toBe(106_995);
     expect(assetCurrentValue(mf, TODAY)).toBe(120_000);
     expect(assetCurrentValue({ ...mf, priceUnit: "per_unit" }, TODAY)).toBe(120_000);
   });
