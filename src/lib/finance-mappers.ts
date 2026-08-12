@@ -204,6 +204,11 @@ export const toAsset = (a: AssetRow): Asset => {
     maturity_value?: number | null;
     folio_number?: string | null;
     is_active?: boolean | null;
+    last_price_at?: string | null;
+    symbol?: string | null;
+    exchange?: string | null;
+    price_source?: string | null;
+    price_unit?: string | null;
   };
   const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return {
@@ -223,6 +228,11 @@ export const toAsset = (a: AssetRow): Asset => {
     folio: x.folio_number ?? null,
     institution: a.institution ?? null,
     isActive: x.is_active ?? true,
+    lastPriceAt: x.last_price_at ?? null,
+    symbol: x.symbol ?? null,
+    exchange: x.exchange ?? null,
+    priceSource: x.price_source ?? "manual",
+    priceUnit: x.price_unit ?? "per_unit",
   };
 };
 
