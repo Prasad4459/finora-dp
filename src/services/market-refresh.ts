@@ -1,11 +1,34 @@
 // Pure, React-free rules for the daily market-price refresh (Release 7C).
 // It decides WHICH holdings may be repriced, WHETHER a fetched quote should be
 // written, and HOW fresh a stored price is. No network, no Supabase, no React.
-import { instrumentMeta, isValidPrice } from "@/services/instruments";
+import { instrumentMeta, isValidPrice, priceUnitMatches } from "@/services/instruments";
 
 /** Price sources that a provider can actually refresh today. */
 export const REFRESHABLE_SOURCES = ["amfi", "nse", "bse"] as const;
 export type RefreshableSource = (typeof REFRESHABLE_SOURCES)[number];
+
+/** Sources a future provider could serve, even if not wired yet. */
+export const KNOWN_SOURCES = ["amfi", "nse", "bse", "gold_inr"] as const;
+export type KnownSource = (typeof KNOWN_SOURCES)[number];
+
+/**
+ * PROVIDER ELIGIBILITY IS PER INSTRUMENT TYPE, never per asset class.
+ * A ₹/gram gold quote must never reach a Gold ETF (exchange units) or a Gold
+ * Fund (NAV units), and an equity ticker must never reach physical gold.
+ * Instruments absent from this map fall back to the generic market sources.
+ */
+export const SOURCES_BY_INSTRUMENT: Record<string, readonly KnownSource[]> = {
+  Gold: ["gold_inr"],
+  "Digital Gold": ["gold_inr"],
+  "Gold ETF": ["nse", "bse"],
+  "Gold Fund": ["amfi"],
+  // Deliberately manual for now: no trustworthy per-instrument source yet.
+  Silver: [],
+  "Sovereign Gold Bond": [],
+};
+
+export const allowedSourcesFor = (type: string): readonly KnownSource[] =>
+  SOURCES_BY_INSTRUMENT[type] ?? (REFRESHABLE_SOURCES as readonly KnownSource[]);
 
 export type RefreshableAsset = {
   id: string;
@@ -17,6 +40,8 @@ export type RefreshableAsset = {
   symbol?: string | null;
   exchange?: string | null;
   priceSource?: string | null;
+  /** Stored price_unit ("per_unit" | "per_gram"). */
+  priceUnit?: string | null;
 };
 
 export type PriceRequest = {
@@ -49,6 +74,11 @@ export function isRefreshable(a: RefreshableAsset): boolean {
   if (!(Number(a.units ?? 0) > 0)) return false;
   const source = String(a.priceSource ?? "manual").toLowerCase();
   if (!REFRESHABLE_SOURCES.includes(source as RefreshableSource)) return false;
+  // Per-instrument gate: the source must make sense for THIS instrument.
+  if (!allowedSourcesFor(a.type).includes(source as KnownSource)) return false;
+  // A holding whose stored unit contradicts its instrument is never repriced.
+  if (a.priceUnit != null && a.priceUnit !== "" && !priceUnitMatches(a.type, a.priceUnit))
+    return false;
   return Boolean(a.symbol && String(a.symbol).trim());
 }
 
@@ -70,8 +100,15 @@ export const buildRefreshQueue = (assets: RefreshableAsset[]): PriceRequest[] =>
  * the price or the valuation date has moved — re-running the refresh twice in a
  * day never appends a second identical asset_valuations row.
  */
-export function shouldApply(a: RefreshableAsset, q: { price: number; asOf: string }): boolean {
+export function shouldApply(
+  a: RefreshableAsset,
+  q: { price: number; asOf: string; priceUnit?: string | null },
+): boolean {
   if (!isValidPrice(q.price)) return false;
+  // A quote quoted in the wrong unit is discarded, never applied.
+  if (q.priceUnit != null && !priceUnitMatches(a.type, q.priceUnit)) return false;
+  if (a.priceUnit != null && a.priceUnit !== "" && !priceUnitMatches(a.type, a.priceUnit))
+    return false;
   const sameDay = (a.lastPriceAt ?? "").slice(0, 10) === q.asOf.slice(0, 10);
   const samePrice = Number(a.lastPrice ?? 0) === q.price;
   return !(sameDay && samePrice);
