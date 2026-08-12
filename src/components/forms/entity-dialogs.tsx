@@ -13,7 +13,7 @@ import {
 import { todayISO } from "@/lib/date-in";
 import { formatINR } from "@/lib/format";
 import { FREQUENCY_LABEL, FREQUENCY_OPTIONS, type Frequency } from "@/services/bills";
-import { COMPOUNDING_OPTIONS, instrumentMeta, type InstrumentField } from "@/services/instruments";
+import { COMPOUNDING_OPTIONS, instrumentMeta, instrumentPriceUnit, type InstrumentField } from "@/services/instruments";
 import { useFinance, type EditTarget } from "@/store/finance-store";
 import type { EntityKind } from "@/types/finance";
 
