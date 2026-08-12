@@ -128,6 +128,21 @@ export type AskContext = {
   bills: Array<{ name: string; amount: number; due: string }>;
   contributions: Array<{ name: string; amount: number; frequency: string; nextDue: string }>;
   topCategories: Array<{ name: string; spent: number }>;
+  /** Market-valued holdings + valuation history (Release 7D). */
+  market: MarketContext;
+  /** Recorded activity for today (IST), by ledger type. Aggregates only. */
+  today: {
+    date: string;
+    income: number;
+    dividend: number;
+    refund: number;
+    expense: number;
+    investment: number;
+    redemption: number;
+    emi: number;
+    transfer: number;
+    count: number;
+  };
   hasData: boolean;
 };
 
