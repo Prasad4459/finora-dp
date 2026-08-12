@@ -59,6 +59,15 @@ import {
   type MarketContext,
   type ValuationPoint,
 } from "@/services/market-context";
+import {
+  attributePortfolioChange,
+  emptyFlows,
+  marketChangeOverPeriod,
+  reconcileNetWorth,
+  type PeriodFlows,
+  type PortfolioChange,
+  type Reconciliation,
+} from "@/services/reconciliation";
 import type { Asset } from "@/types/finance";
 
 type Db = SupabaseClient<Database>;
@@ -130,6 +139,10 @@ export type AskContext = {
   topCategories: Array<{ name: string; spent: number }>;
   /** Market-valued holdings + valuation history (Release 7D). */
   market: MarketContext;
+  /** Verified net-worth reconciliation for the current month (Release 7D). */
+  reconciliation: Reconciliation;
+  /** Portfolio change attribution: contributions vs withdrawals vs market. */
+  portfolio: PortfolioChange;
   /** Recorded activity for today (IST), by ledger type. Aggregates only. */
   today: {
     date: string;
@@ -168,6 +181,34 @@ function aggregatesFromRows(rows: Array<Record<string, unknown>>): Map<string, M
     map.set(key, agg);
   }
   return map;
+}
+
+/**
+ * Ledger flows for ONE month, taken from the same Postgres aggregate rows.
+ * Unlike MonthAggregate this keeps redemptions, because a withdrawal must be
+ * reported separately and must never be folded into income.
+ */
+function flowsForMonth(rows: Array<Record<string, unknown>>, key: string): PeriodFlows {
+  const flows = emptyFlows();
+  for (const r of rows) {
+    if (monthKeyOf({ year: Number(r['y']), month: Number(r['m']) }) !== key) continue;
+    const total = num(r['total']);
+    switch (String(r['tx_type'])) {
+      case "income": flows.income += total; break;
+      case "dividend": flows.dividend += total; break;
+      case "refund": flows.refund += total; break;
+      case "expense": flows.expense += total; break;
+      case "investment": flows.investmentContribution += total; break;
+      case "redemption": flows.investmentWithdrawal += total; break;
+      case "transfer": flows.transfer += total; break;
+      case "emi":
+        flows.emiPaid += total;
+        flows.emiInterest += num(r['interest_total']);
+        flows.emiPrincipal += num(r['principal_total']);
+        break;
+    }
+  }
+  return flows;
 }
 
 /** Reads the signed-in user's position. RLS scopes every query to that user. */
@@ -313,6 +354,32 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
   const totals = computeTotals({ accounts, assets, liabilities, month });
   const health = computeHealthScore(totals);
 
+  // ---- Net-worth reconciliation for the current IST month (Release 7D) ----
+  // Cash flow, market movement and net-worth movement are computed separately
+  // and only then compared. Nothing here writes or re-values anything.
+  const monthBounds = monthRange(current);
+  const summaryRows = (summaryRes.data ?? []) as Array<Record<string, unknown>>;
+  const monthFlows = flowsForMonth(summaryRows, monthKeyOf(current));
+  const periodMarket = marketChangeOverPeriod(
+    valuations.map((v) => ({ assetId: v.assetId, asOf: v.asOf, value: v.value })),
+    monthBounds.from,
+    monthBounds.to,
+  );
+  const reconciliation = reconcileNetWorth({
+    from: monthBounds.from,
+    to: monthBounds.to,
+    label: monthLongLabel(current),
+    endingNetWorth: totals.netWorth,
+    beginningNetWorth: null, // Finora stores no net-worth snapshots.
+    flows: monthFlows,
+    marketChange: periodMarket.change,
+  });
+  const portfolio = attributePortfolioChange({
+    contributed: monthFlows.investmentContribution,
+    withdrawn: monthFlows.investmentWithdrawal,
+    marketChange: periodMarket.change,
+  });
+
   // Averages over the months that actually have activity — same rule the
   // What-If page uses, so the simulator and the copilot agree.
   const active = series.filter((s) => s.metrics.grossIncome > 0 || s.metrics.cashOutflow > 0);
@@ -411,6 +478,8 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
     contributions,
     topCategories,
     market,
+    reconciliation,
+    portfolio,
     today: todayActivity,
     hasData:
       accounts.length > 0 ||
@@ -699,6 +768,9 @@ You explain and interpret figures that have ALREADY been calculated for you by F
 ANSWER FORMAT — reply using only these section headings, each on its own line, in this order, omitting any section that has nothing useful to say:
 SUMMARY
 YOUR NUMBERS
+MARKET CHANGE
+TRANSACTION CHANGE
+RECONCILIATION
 OPTIONS
 PROJECTED IMPACT
 TRADE-OFF
@@ -723,6 +795,16 @@ MARKET AWARENESS — three different kinds of change; never mix them up:
 - Only state a market valuation change when the context gives one. If the context says the change is NOT AVAILABLE, say: "Current market value is ₹X, but I don't yet have a previous valuation to calculate today's change." Never invent a previous price or a market return.
 - For "why did my net worth change?", explain using the components present in the context — wallet/cash movement, income, expenses, investment contributions, redemptions, market valuation change and liability changes — and never attribute a market-driven change to a transaction that did not occur.
 - For simple factual market questions (current value, unrealised gain, best performer, today's change), answer with SUMMARY and YOUR NUMBERS only. Do not force OPTIONS, PROJECTED IMPACT, TRADE-OFF or ASSUMPTIONS sections when no projection was run.
+
+NET-WORTH RECONCILIATION — these rules override everything else for factual historical questions:
+- NEVER say a net-worth change equals income minus expenses. Use only the NET-WORTH RECONCILIATION block.
+- For "why did my net worth change?" answer with exactly these sections, in order: SUMMARY (the verified/explained net-worth change first), YOUR NUMBERS (beginning net worth, ending net worth, major components), MARKET CHANGE (valuation gain/loss only), TRANSACTION CHANGE (income, expenses, contributions, withdrawals, EMI principal and interest, each separately), RECONCILIATION (whether the components explain the change, and the unexplained difference if any).
+- An investment contribution is a transfer of cash into investments: never describe it as a reduction in net worth. A withdrawal/redemption is never income. Loan principal repayment is never an expense; loan interest is.
+- If the reconciliation block reports an unexplained difference, state that difference plainly and say the available records don't fully explain it. Never invent a cause.
+- If the beginning net worth is DERIVED rather than verified, say so in one short line.
+- Never run or quote a projection for a factual historical question.
+- For "how much did I earn today?": state recorded income for today from TODAY'S RECORDED ACTIVITY. If it is ₹0, say "₹0 recorded income today" and report any market movement separately as an unrealised market change, never as earnings.
+- For "what changed in my portfolio?": use the PORTFOLIO CHANGE block and separate money contributed, money withdrawn, market gain/loss and the resulting portfolio-value change.
 
 Rules:
 - Never present a projection as guaranteed. Prefer "under these assumptions, X is projected to ..." over "X will ...".
@@ -793,6 +875,55 @@ function marketBlock(ctx: AskContext): string[] {
 }
 
 /** TODAY block — recorded ledger activity for the IST day, aggregates only. */
+function reconciliationBlock(ctx: AskContext): string[] {
+  const rec = ctx.reconciliation;
+  const p = ctx.portfolio;
+  const lines: string[] = ["", `NET-WORTH RECONCILIATION for ${rec.label} (${rec.from} to ${rec.to}) — the ONLY valid basis for explaining a net-worth change. Never substitute "income minus expenses":`];
+  lines.push(
+    `- Beginning net worth: ${money(rec.beginningNetWorth)} (${rec.beginningIsVerified ? "verified" : "DERIVED by working backwards from today's verified net worth — say it is derived, not measured"})`,
+  );
+  lines.push(`- Ending net worth: ${money(rec.endingNetWorth)} (verified, today's position)`);
+  lines.push(
+    rec.verifiedChange === null
+      ? `- Net-worth change explained by the identified components: ${money(rec.explainedChange)}. There is no independently verified beginning net worth to check this against.`
+      : `- Verified net-worth change: ${money(rec.verifiedChange)}; explained by components: ${money(rec.explainedChange)}`,
+  );
+  lines.push("- Components that DO change net worth:");
+  for (const c of rec.components) {
+    const direction =
+      c.effect === 0 ? "no effect (₹0)" : c.effect > 0 ? `adds ${money(c.effect)}` : `reduces net worth by ${money(Math.abs(c.effect))}`;
+    lines.push(`  - ${c.label}: ${direction} — ${c.note}`);
+  }
+  lines.push("- Movements that do NOT change net worth (they only move money between places):");
+  for (const m of rec.neutralMovements) {
+    lines.push(`  - ${m.label}: ${money(m.amount)} — ${m.note}`);
+  }
+  lines.push(
+    rec.unexplained === null
+      ? "- Unexplained difference: NOT MEASURABLE without a verified beginning net worth."
+      : rec.reconciles
+        ? `- Reconciliation: the components fully explain the change (residual ${money(rec.unexplained)}).`
+        : `- UNEXPLAINED DIFFERENCE: ${money(rec.unexplained)}. Report this number and say the available records do not fully explain the change. Do NOT invent a cause.`,
+  );
+  for (const n of rec.notes) lines.push(`- Note: ${n}`);
+  lines.push("");
+  lines.push("PORTFOLIO CHANGE (contribution vs withdrawal vs market movement):");
+  lines.push(`- Money contributed this period: ${money(p.contributed)}`);
+  lines.push(`- Money withdrawn this period: ${money(p.withdrawn)}`);
+  lines.push(
+    p.marketChange === null
+      ? "- Market gain/loss over this period: NOT MEASURABLE — no holding has a valuation recorded before this period started."
+      : `- Market gain/loss over this period: ${money(p.marketChange)} (unrealised, not income)`,
+  );
+  lines.push(
+    p.totalChange === null
+      ? "- Resulting portfolio-value change: cannot be stated because the market component is unknown."
+      : `- Resulting portfolio-value change: ${money(p.totalChange)}. Attribution sentence to use: ${p.explanation}`,
+  );
+  return lines;
+}
+
+/** TODAY block — recorded ledger activity for the IST day, aggregates only. */
 function todayBlock(ctx: AskContext): string[] {
   const t = ctx.today;
   const lines = ["", `TODAY'S RECORDED ACTIVITY (${t.date}, Asia/Kolkata) — TRANSACTIONS, not market movement:`];
@@ -842,6 +973,7 @@ function buildContextLines(ctx: AskContext, outcome: ScenarioOutcome): string[] 
 
   lines.push(...marketBlock(ctx));
   lines.push(...todayBlock(ctx));
+  lines.push(...reconciliationBlock(ctx));
 
   if (s.liabilities.length) {
     lines.push("");
