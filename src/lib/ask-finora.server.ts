@@ -54,6 +54,12 @@ import {
   todayISO,
   type MonthRef,
 } from "@/lib/date-in";
+import {
+  buildMarketContext,
+  type MarketContext,
+  type ValuationPoint,
+} from "@/services/market-context";
+import type { Asset } from "@/types/finance";
 
 type Db = SupabaseClient<Database>;
 
