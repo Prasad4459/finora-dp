@@ -179,10 +179,14 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
   const today = todayISO();
   const horizon = monthRange(addMonths(current, 1)).to;
 
-  const [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes] =
+  const [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes, valuationsRes, todayRes] =
     await Promise.all([
       supabase.from("wallets").select("name, type, balance, is_active"),
-      supabase.from("assets").select("name, type, current_value, is_active"),
+      supabase
+        .from("assets")
+        .select(
+          "id, name, type, purchase_value, current_value, quantity, units, avg_cost, last_price, last_price_at, interest_rate, compounding, maturity_date, purchase_date, created_at, symbol, exchange, price_source, price_unit, institution, is_active",
+        ),
       supabase
         .from("liabilities")
         .select("id, name, type, outstanding_balance, interest_rate, emi_amount, remaining_months, status"),
@@ -206,9 +210,15 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
         .limit(20),
       supabase.rpc("tx_summary_monthly", { _from: from, _to: to }),
       supabase.rpc("tx_category_monthly", { _from: monthRange(current).from, _to: to }),
+      supabase
+        .from("asset_valuations")
+        .select("asset_id, as_of, value")
+        .order("as_of", { ascending: false })
+        .limit(400),
+      supabase.from("transactions").select("type, amount").eq("transaction_date", today),
     ]);
 
-  const firstError = [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes]
+  const firstError = [walletsRes, assetsRes, liabRes, goalsRes, budgetsRes, billsRes, contribRes, summaryRes, catRes, valuationsRes, todayRes]
     .map((r) => r.error)
     .find(Boolean);
   if (firstError) throw new Error(`[ask-finora] ${firstError.message}`);
