@@ -95,7 +95,7 @@ const ASSET_TYPE_BY_LABEL: Record<string, AssetType> = {
   Crypto: "crypto",
 };
 
-const ASSET_LABEL_BY_TYPE: Record<AssetType, string> = {
+export const ASSET_LABEL_BY_TYPE: Record<AssetType, string> = {
   cash: "Cash",
   bank: "Bank",
   fixed_deposit: "FD",
