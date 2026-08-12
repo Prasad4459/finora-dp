@@ -196,7 +196,12 @@ export function EntityDialogs({
       key: "exchange",
       label: "Exchange",
       type: "select",
-      options: ["", "NSE", "BSE"],
+      options: [
+        { value: "none", label: "Not applicable" },
+        { value: "NSE", label: "NSE" },
+        { value: "BSE", label: "BSE" },
+      ],
+      placeholder: "Select exchange",
       showWhen: (v) => shows("exchange")(v) && String(v.priceSource ?? "") !== "amfi",
     },
     priceSource: {
@@ -412,7 +417,7 @@ export function EntityDialogs({
             institution: v.institution || null,
             folio: v.folio || null,
             symbol: v.symbol || null,
-            exchange: v.exchange || null,
+            exchange: !v.exchange || v.exchange === "none" ? null : v.exchange,
             priceSource: v.priceSource || "manual",
             units: num(v.units),
             avgCost: num(v.avgCost),
