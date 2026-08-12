@@ -882,7 +882,7 @@ function buildContextLines(ctx: AskContext, outcome: ScenarioOutcome): string[] 
 
   lines.push(...decisionBlocks(outcome));
 
-  return lines.join("\n");
+  return lines;
 }
 
 /** Appends the Release 6 decision blocks. Called from buildContextBlock. */
