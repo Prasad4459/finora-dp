@@ -16,7 +16,7 @@
 //   transfers (incl. goal contributions) are never income or expense.
 import type { Account, Asset, Budget, Liability } from "@/types/finance";
 import { currentMonthKey, isInMonth, todayISO } from "@/lib/date-in";
-import { INSTRUMENTS } from "@/services/instruments";
+import { INSTRUMENTS, assetCurrentValue } from "@/services/instruments";
 
 export { currentMonthKey, isInMonth, todayISO };
 
@@ -172,17 +172,22 @@ export function computeTotals(input: {
   liabilities: Liability[];
   /** Server-aggregated metrics for the month being shown. */
   month: MonthMetrics;
+  /** Valuation date (IST). Defaults to today so accrual values match the UI. */
+  asOfISO?: string;
 }): FinanceTotals {
+  const asOf = input.asOfISO ?? todayISO();
   // Only wallets that are the authoritative home of their value (see
   // NET-WORTH AUTHORITY RULE above) contribute to the liquid balance.
   const totalBalance = sum(input.accounts.filter(isNetWorthAccount), (a) => a.balance);
   // Wallet-mirrored assets (plain cash / bank holdings) are excluded so the
   // same money is not counted twice in net worth.
   const netWorthAssets = input.assets.filter((a) => !WALLET_MIRRORED_ASSET_TYPES.includes(a.type));
-  const totalAssets = sum(netWorthAssets, (a) => a.current);
+  // Net worth uses the SAME valuation the Investments page shows
+  // (assetCurrentValue), so the two can never silently disagree.
+  const totalAssets = sum(netWorthAssets, (a) => assetCurrentValue(a, asOf));
   const totalInvestments = sum(
     input.assets.filter((a) => INVESTMENT_ASSET_TYPES.includes(a.type)),
-    (a) => a.current,
+    (a) => assetCurrentValue(a, asOf),
   );
   const totalDebt = sum(input.liabilities, (l) => l.balance);
   const month = input.month;

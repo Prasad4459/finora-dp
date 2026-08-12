@@ -11,7 +11,7 @@
 import type { Asset, InvestmentContribution } from "@/types/finance";
 import {
   ASSET_CLASS_LABEL,
-  derivedValue,
+  assetCurrentValue,
   gainOf,
   instrumentMeta,
   type AssetClass,
@@ -56,21 +56,8 @@ export const isInvestment = (a: Asset) => instrumentMeta(a.type).investment;
 
 export function toHolding(a: Asset, todayISO: string): Holding {
   const meta = instrumentMeta(a.type);
-  const value = derivedValue(
-    {
-      type: a.type,
-      purchase: a.purchase,
-      current: a.current,
-      date: a.date,
-      units: a.units,
-      avgCost: a.avgCost,
-      lastPrice: a.lastPrice,
-      rate: a.rate,
-      compounding: a.compounding,
-      maturityDate: a.maturityDate,
-    },
-    todayISO,
-  );
+  // Same helper the net-worth engine uses — one source of current value.
+  const value = assetCurrentValue(a, todayISO);
   const invested = a.purchase;
   const { gain, pct } = gainOf(value, invested);
   return {
