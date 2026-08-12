@@ -10,6 +10,9 @@ export type AssetClass = "equity" | "debt" | "small_savings" | "gold" | "alterna
 /** How an instrument's current value is arrived at. */
 export type ValuationMode = "market" | "accrual" | "manual";
 
+/** The unit a market price is quoted in. */
+export type PriceUnit = "per_unit" | "per_gram";
+
 /** Every field an instrument form can ask for. */
 export type InstrumentField =
   | "institution"
@@ -49,6 +52,11 @@ export type InstrumentMeta = {
   redeemable: boolean;
   /** Statutory lock-in in years, when one applies. */
   lockInYears?: number;
+  /**
+   * Unit a market price is quoted in for this instrument. Physical/digital
+   * metal is priced per gram; funds, ETFs and bonds per unit.
+   */
+  priceUnit: PriceUnit;
   /** Can be funded by an employer (EPF / NPS) without a wallet outflow. */
   employerFunded?: boolean;
   /** Exact fields the dynamic form should render, in order. */
@@ -66,6 +74,7 @@ const DEFAULT_META: InstrumentMeta = {
   investment: false,
   price: false,
   redeemable: false,
+  priceUnit: "per_unit",
   fields: ["purchase", "current", "date"],
 };
 
@@ -142,9 +151,9 @@ export const INSTRUMENTS: Record<string, InstrumentMeta> = {
   SCSS: m({ label: "SCSS", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, investment: true, lockInYears: 5, fields: SMALL_SAVINGS_FIELDS }),
   "Post Office": m({ label: "Post Office", assetClass: "small_savings", valuation: "accrual", rate: true, maturity: true, schedule: true, investment: true, fields: SMALL_SAVINGS_FIELDS }),
 
-  Gold: m({ label: "Gold", assetClass: "gold", valuation: "market", units: true, investment: true }),
-  Silver: m({ label: "Silver", assetClass: "gold", valuation: "market", units: true, investment: true }),
-  "Digital Gold": m({ label: "Digital Gold", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
+  Gold: m({ label: "Gold", assetClass: "gold", valuation: "market", units: true, investment: true, priceUnit: "per_gram" }),
+  Silver: m({ label: "Silver", assetClass: "gold", valuation: "market", units: true, investment: true, priceUnit: "per_gram" }),
+  "Digital Gold": m({ label: "Digital Gold", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true, priceUnit: "per_gram" }),
   "Gold ETF": m({ label: "Gold ETF", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
   "Gold Fund": m({ label: "Gold Fund", assetClass: "gold", valuation: "market", units: true, schedule: true, investment: true }),
   "Sovereign Gold Bond": m({ label: "Sovereign Gold Bond", assetClass: "gold", valuation: "market", units: true, maturity: true, investment: true, lockInYears: 5, fields: ["institution", "folio", "purchase", "units", "lastPrice", "date", "maturityDate"] }),
@@ -155,6 +164,21 @@ export const INSTRUMENTS: Record<string, InstrumentMeta> = {
 };
 
 export const instrumentMeta = (label: string): InstrumentMeta => INSTRUMENTS[label] ?? DEFAULT_META;
+
+/**
+ * AUTHORITATIVE PRICE UNIT for an instrument. Physical gold, digital gold and
+ * silver are quoted per gram; everything else per unit. Stored metadata never
+ * overrides this — it is only validated against it.
+ */
+export const instrumentPriceUnit = (label: string): PriceUnit => instrumentMeta(label).priceUnit;
+
+/**
+ * A stored / incoming price unit is usable only when it matches the
+ * instrument's own convention. A missing value is treated as "unknown" and is
+ * NOT assumed to match: callers preserve the last known value instead.
+ */
+export const priceUnitMatches = (label: string, unit: string | null | undefined): boolean =>
+  typeof unit === "string" && unit.trim() !== "" && unit === instrumentPriceUnit(label);
 
 export const isInvestmentInstrument = (label: string) => instrumentMeta(label).investment;
 
@@ -242,6 +266,8 @@ export type HoldingInput = {
   rate?: number | null;
   compounding?: string | null;
   maturityDate?: string | null;
+  /** Stored price_unit. When absent the instrument default is assumed. */
+  priceUnit?: string | null;
 };
 
 /**
@@ -252,6 +278,13 @@ export type HoldingInput = {
 export function derivedValue(h: HoldingInput, asOfISO: string): number {
   const meta = instrumentMeta(h.type);
   if (meta.valuation === "market") {
+    // PRICE-UNIT SAFETY. A per_gram price must never be multiplied into a
+    // per_unit holding (or vice versa). When the stored unit disagrees with the
+    // instrument's convention we keep the last known value instead of
+    // inventing one.
+    if (h.priceUnit != null && h.priceUnit !== "" && !priceUnitMatches(h.type, h.priceUnit)) {
+      return h.current || h.purchase;
+    }
     // A market price is only meaningful PER UNIT. When none is recorded we fall
     // back to average cost (value == invested, gain 0) — never to a stored
     // figure multiplied by units, which would inflate the portfolio.
