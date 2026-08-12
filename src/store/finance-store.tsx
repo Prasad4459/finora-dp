@@ -401,6 +401,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const assetPayload = (v: AssetInput) => {
     const { units, avgCost, lastPrice, current } = unitValuation(v);
+    // A price timestamp is only written when the user actually supplied a
+    // price. A cost-derived fallback is NOT a valuation, so it stays null.
+    const userPriced = numOrNull(v.lastPrice) !== null;
     return {
     name: v.name,
     type: assetTypeFromLabel(v.type),
@@ -411,6 +414,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     units,
     avg_cost: avgCost,
     last_price: lastPrice,
+    last_price_at: userPriced ? new Date().toISOString() : null,
+    symbol: v.symbol || null,
+    exchange: v.exchange || null,
+    price_source: v.priceSource || "manual",
+    price_unit: v.priceUnit || (instrumentMeta(v.type).assetClass === "gold" ? "per_gram" : "per_unit"),
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,
