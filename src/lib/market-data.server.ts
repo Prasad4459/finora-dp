@@ -1,0 +1,140 @@
+// SERVER-ONLY market-data adapters (Release 7C).
+//
+// Provider access lives here so no API key can ever reach the browser bundle.
+// Two adapters today, both EOD/daily:
+//   • AMFI  — free public NAVAll.txt feed, keyed by AMFI scheme code.
+//   • Twelve Data — NSE/BSE stocks & ETFs, keyed by symbol + exchange.
+// Swapping a provider means editing only this file.
+import type { PriceRequest, Quote, QuoteFailure } from "@/services/market-refresh";
+import { isValidPrice } from "@/services/instruments";
+
+const AMFI_NAV_URL = "https://www.amfiindia.com/spages/NAVAll.txt";
+const TWELVE_DATA_URL = "https://api.twelvedata.com/quote";
+/** Nobody waits indefinitely for a failed instrument. */
+const TIMEOUT_MS = 8_000;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const timeout = () => AbortSignal.timeout(TIMEOUT_MS);
+
+/** "11-Aug-2026" -> "2026-08-11". Returns null for anything unexpected. */
+export function parseAmfiDate(raw: string): string | null {
+  const [d, mon, y] = raw.trim().split("-");
+  const m = MONTHS.indexOf(mon);
+  if (!d || m < 0 || !y || y.length !== 4) return null;
+  return `${y}-${String(m + 1).padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
+export type AmfiNav = { price: number; asOf: string };
+
+/** Parses the AMFI NAVAll feed into a scheme-code -> NAV map. */
+export function parseAmfiFeed(text: string): Map<string, AmfiNav> {
+  const out = new Map<string, AmfiNav>();
+  for (const line of text.split("\n")) {
+    if (!line.includes(";")) continue;
+    const parts = line.split(";");
+    if (parts.length < 6) continue;
+    const code = parts[0].trim();
+    if (!/^\d+$/.test(code)) continue;
+    const price = Number(parts[4].trim());
+    const asOf = parseAmfiDate(parts[5] ?? "");
+    if (!isValidPrice(price) || !asOf) continue;
+    out.set(code, { price, asOf });
+  }
+  return out;
+}
+
+async function loadAmfiFeed(): Promise<Map<string, AmfiNav>> {
+  const res = await fetch(AMFI_NAV_URL, { signal: timeout() });
+  if (!res.ok) throw new Error(`AMFI feed returned ${res.status}`);
+  return parseAmfiFeed(await res.text());
+}
+
+async function fetchTwelveData(
+  req: PriceRequest,
+  apiKey: string,
+): Promise<{ price: number; asOf: string }> {
+  const url = new URL(TWELVE_DATA_URL);
+  url.searchParams.set("symbol", req.symbol);
+  if (req.exchange) url.searchParams.set("exchange", req.exchange);
+  url.searchParams.set("country", "India");
+  url.searchParams.set("apikey", apiKey);
+
+  const res = await fetch(url, { signal: timeout() });
+  if (!res.ok) throw new Error(`provider returned ${res.status}`);
+  const body = (await res.json()) as {
+    close?: string | number;
+    previous_close?: string | number;
+    datetime?: string;
+    status?: string;
+    message?: string;
+  };
+  if (body.status === "error") throw new Error(body.message ?? "provider error");
+  const price = Number(body.close ?? body.previous_close);
+  if (!isValidPrice(price)) throw new Error("no usable close price");
+  const asOf = String(body.datetime ?? "").slice(0, 10);
+  return { price, asOf: /^\d{4}-\d{2}-\d{2}$/.test(asOf) ? asOf : todayIST() };
+}
+
+/** Today's IST calendar date, duplicated here to keep this module dependency-free. */
+export function todayIST(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+export type QuoteBatch = { quotes: Quote[]; failures: QuoteFailure[] };
+
+/**
+ * Fetches EOD prices for a batch of requests. A provider failure degrades to a
+ * per-instrument failure entry — the caller keeps the last known good value.
+ */
+export async function fetchQuotes(requests: PriceRequest[]): Promise<QuoteBatch> {
+  const quotes: Quote[] = [];
+  const failures: QuoteFailure[] = [];
+  if (requests.length === 0) return { quotes, failures };
+
+  const amfiReqs = requests.filter((r) => r.source === "amfi");
+  const equityReqs = requests.filter((r) => r.source !== "amfi");
+
+  if (amfiReqs.length > 0) {
+    try {
+      const feed = await loadAmfiFeed();
+      for (const r of amfiReqs) {
+        const nav = feed.get(r.symbol.replace(/\D/g, ""));
+        if (!nav) failures.push({ id: r.id, reason: `No AMFI NAV for scheme ${r.symbol}` });
+        else quotes.push({ id: r.id, price: nav.price, asOf: nav.asOf, source: "amfi" });
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "AMFI feed unavailable";
+      amfiReqs.forEach((r) => failures.push({ id: r.id, reason }));
+    }
+  }
+
+  if (equityReqs.length > 0) {
+    const apiKey = process.env["TWELVE_DATA_API_KEY"];
+    if (!apiKey) {
+      equityReqs.forEach((r) =>
+        failures.push({ id: r.id, reason: "Market data provider is not configured" }),
+      );
+    } else {
+      const settled = await Promise.allSettled(
+        equityReqs.map((r) => fetchTwelveData(r, apiKey)),
+      );
+      settled.forEach((result, i) => {
+        const r = equityReqs[i];
+        if (result.status === "fulfilled") {
+          quotes.push({ id: r.id, price: result.value.price, asOf: result.value.asOf, source: r.source });
+        } else {
+          const reason =
+            result.reason instanceof Error ? result.reason.message : "price unavailable";
+          failures.push({ id: r.id, reason });
+        }
+      });
+    }
+  }
+
+  return { quotes, failures };
+}
