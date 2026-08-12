@@ -757,6 +757,9 @@ export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): st
     for (const c of ctx.topCategories) lines.push(`- ${c.name}: ${money(c.spent)}`);
   }
 
+  lines.push(...marketBlock(ctx));
+  lines.push(...todayBlock(ctx));
+
   if (s.liabilities.length) {
     lines.push("");
     lines.push("LOANS:");
