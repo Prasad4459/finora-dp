@@ -14,6 +14,9 @@ export type ValuationMode = "market" | "accrual" | "manual";
 export type InstrumentField =
   | "institution"
   | "folio"
+  | "symbol"
+  | "exchange"
+  | "priceSource"
   | "units"
   | "avgCost"
   | "lastPrice"
@@ -70,6 +73,9 @@ const DEFAULT_META: InstrumentMeta = {
 const UNIT_FIELDS: InstrumentField[] = [
   "institution",
   "folio",
+  "symbol",
+  "exchange",
+  "priceSource",
   "purchase",
   "units",
   "lastPrice",
