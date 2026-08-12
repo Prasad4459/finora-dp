@@ -124,7 +124,10 @@ export type Reconciliation = {
   notes: string[];
 };
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+const r2 = (n: number) => {
+  const v = Math.round(n * 100) / 100;
+  return v === 0 ? 0 : v; // normalises -0 so "no effect" always reads as 0
+};
 
 export function reconcileNetWorth(input: ReconciliationInput): Reconciliation {
   const f = input.flows;
