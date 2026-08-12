@@ -15,14 +15,16 @@ export const fetchMarketQuotes = createServerFn({ method: "POST" })
   .inputValidator((input: { items: PriceRequest[] }) => {
     const items = Array.isArray(input?.items) ? input.items : [];
     const clean = items
-      .filter((i) => i && typeof i.id === "string" && typeof i.symbol === "string")
+      .filter((i) => i && typeof i.id === "string")
       .slice(0, MAX_ITEMS)
       .map((i) => ({
         id: i.id,
         name: String(i.name ?? ""),
-        symbol: String(i.symbol).trim().slice(0, 32),
+        symbol: String(i.symbol ?? "").trim().slice(0, 32),
         exchange: i.exchange ? String(i.exchange).trim().slice(0, 16) : null,
-        source: (["amfi", "nse", "bse"].includes(String(i.source)) ? i.source : "nse") as PriceRequest["source"],
+        source: (["amfi", "nse", "bse", "gold_inr"].includes(String(i.source))
+          ? i.source
+          : "nse") as PriceRequest["source"],
       }));
     return { items: clean };
   })

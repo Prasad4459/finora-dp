@@ -16,6 +16,8 @@ const AMFI_NAV_URLS = [
   "https://www.amfiindia.com/spages/NAVAll.txt",
 ];
 const TWELVE_DATA_URL = "https://api.twelvedata.com/quote";
+/** Gold is quoted per troy ounce; Indian holdings are held in grams. */
+export const GRAMS_PER_TROY_OUNCE = 31.1034768;
 /** Nobody waits indefinitely for a failed instrument. */
 const TIMEOUT_MS = 8_000;
 /** The AMFI feed is a ~1.6 MB text file — it needs a longer budget. */
@@ -107,6 +109,54 @@ export function todayIST(now: Date = new Date()): string {
 export type QuoteBatch = { quotes: Quote[]; failures: QuoteFailure[] };
 
 /**
+ * 24K REFERENCE GOLD PRICE IN ₹ PER GRAM.
+ * Twelve Data has no XAU/INR pair, so the spot metal (XAU/USD, "Gold Spot")
+ * is converted with the USD/INR rate from the same provider. This is a pure
+ * bullion reference: no making charges, GST, dealer spread or resale haircut,
+ * and no 22K/18K purity modelling.
+ */
+export async function fetchGoldInrPerGram(
+  apiKey: string,
+): Promise<{ price: number; asOf: string }> {
+  const quote = async (symbol: string) => {
+    const url = new URL(TWELVE_DATA_URL);
+    url.searchParams.set("symbol", symbol);
+    url.searchParams.set("apikey", apiKey);
+    const res = await fetch(url, { signal: timeout() });
+    if (!res.ok) throw new Error(`provider returned ${res.status}`);
+    const body = (await res.json()) as {
+      close?: string | number;
+      previous_close?: string | number;
+      datetime?: string;
+      status?: string;
+      message?: string;
+    };
+    if (body.status === "error") throw new Error(body.message ?? "provider error");
+    const price = Number(body.close ?? body.previous_close);
+    if (!isValidPrice(price)) throw new Error(`no usable price for ${symbol}`);
+    const asOf = String(body.datetime ?? "").slice(0, 10);
+    return { price, asOf: /^\d{4}-\d{2}-\d{2}$/.test(asOf) ? asOf : todayIST() };
+  };
+
+  const [xau, inr] = await Promise.all([quote("XAU/USD"), quote("USD/INR")]);
+  return goldPerGram(xau, inr);
+}
+
+/** Pure conversion — unit-tested without touching the network. */
+export function goldPerGram(
+  xauUsd: { price: number; asOf: string },
+  usdInr: { price: number; asOf: string },
+): { price: number; asOf: string } {
+  const perGram = (xauUsd.price * usdInr.price) / GRAMS_PER_TROY_OUNCE;
+  if (!isValidPrice(perGram)) throw new Error("gold reference price unavailable");
+  return {
+    price: Math.round(perGram * 100) / 100,
+    // The older of the two legs is the honest valuation date.
+    asOf: xauUsd.asOf < usdInr.asOf ? xauUsd.asOf : usdInr.asOf,
+  };
+}
+
+/**
  * Fetches EOD prices for a batch of requests. A provider failure degrades to a
  * per-instrument failure entry — the caller keeps the last known good value.
  */
@@ -116,7 +166,8 @@ export async function fetchQuotes(requests: PriceRequest[]): Promise<QuoteBatch>
   if (requests.length === 0) return { quotes, failures };
 
   const amfiReqs = requests.filter((r) => r.source === "amfi");
-  const equityReqs = requests.filter((r) => r.source !== "amfi");
+  const goldReqs = requests.filter((r) => r.source === "gold_inr");
+  const equityReqs = requests.filter((r) => r.source !== "amfi" && r.source !== "gold_inr");
 
   if (amfiReqs.length > 0) {
     try {
@@ -145,13 +196,33 @@ export async function fetchQuotes(requests: PriceRequest[]): Promise<QuoteBatch>
       settled.forEach((result, i) => {
         const r = equityReqs[i];
         if (result.status === "fulfilled") {
-          quotes.push({ id: r.id, price: result.value.price, asOf: result.value.asOf, source: r.source });
+          quotes.push({ id: r.id, price: result.value.price, asOf: result.value.asOf, source: r.source, priceUnit: "per_unit" });
         } else {
           const reason =
             result.reason instanceof Error ? result.reason.message : "price unavailable";
           failures.push({ id: r.id, reason });
         }
       });
+    }
+  }
+
+  if (goldReqs.length > 0) {
+    const apiKey = process.env["TWELVE_DATA_API_KEY"];
+    if (!apiKey) {
+      goldReqs.forEach((r) =>
+        failures.push({ id: r.id, reason: "Gold price provider is not configured" }),
+      );
+    } else {
+      try {
+        // One reference price serves every gram-denominated holding.
+        const gold = await fetchGoldInrPerGram(apiKey);
+        goldReqs.forEach((r) =>
+          quotes.push({ id: r.id, price: gold.price, asOf: gold.asOf, source: "gold_inr", priceUnit: "per_gram" }),
+        );
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "gold price unavailable";
+        goldReqs.forEach((r) => failures.push({ id: r.id, reason }));
+      }
     }
   }
 
