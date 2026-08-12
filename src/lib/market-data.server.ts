@@ -8,10 +8,18 @@
 import type { PriceRequest, Quote, QuoteFailure } from "@/services/market-refresh";
 import { isValidPrice } from "@/services/instruments";
 
-const AMFI_NAV_URL = "https://www.amfiindia.com/spages/NAVAll.txt";
+// AMFI serves the same NAVAll feed from two hosts. www.amfiindia.com is often
+// unreachable from datacentre egress (connection hangs), so the portal host is
+// tried first and www is only a fallback.
+const AMFI_NAV_URLS = [
+  "https://portal.amfiindia.com/spages/NAVAll.txt",
+  "https://www.amfiindia.com/spages/NAVAll.txt",
+];
 const TWELVE_DATA_URL = "https://api.twelvedata.com/quote";
 /** Nobody waits indefinitely for a failed instrument. */
 const TIMEOUT_MS = 8_000;
+/** The AMFI feed is a ~1.6 MB text file — it needs a longer budget. */
+const AMFI_TIMEOUT_MS = 20_000;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const timeout = () => AbortSignal.timeout(TIMEOUT_MS);
@@ -44,9 +52,20 @@ export function parseAmfiFeed(text: string): Map<string, AmfiNav> {
 }
 
 async function loadAmfiFeed(): Promise<Map<string, AmfiNav>> {
-  const res = await fetch(AMFI_NAV_URL, { signal: timeout() });
-  if (!res.ok) throw new Error(`AMFI feed returned ${res.status}`);
-  return parseAmfiFeed(await res.text());
+  const errors: string[] = [];
+  for (const url of AMFI_NAV_URLS) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(AMFI_TIMEOUT_MS) });
+      if (!res.ok) throw new Error(`returned ${res.status}`);
+      const feed = parseAmfiFeed(await res.text());
+      if (feed.size === 0) throw new Error("feed contained no usable NAV rows");
+      return feed;
+    } catch (err) {
+      const host = new URL(url).host;
+      errors.push(`${host}: ${err instanceof Error ? err.message : "unreachable"}`);
+    }
+  }
+  throw new Error(`AMFI feed unavailable (${errors.join("; ")})`);
 }
 
 async function fetchTwelveData(
