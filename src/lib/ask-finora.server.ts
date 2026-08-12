@@ -890,7 +890,9 @@ function reconciliationBlock(ctx: AskContext): string[] {
   );
   lines.push("- Components that DO change net worth:");
   for (const c of rec.components) {
-    lines.push(`  - ${c.label}: ${money(c.effect)} — ${c.note}`);
+    const direction =
+      c.effect === 0 ? "no effect (₹0)" : c.effect > 0 ? `adds ${money(c.effect)}` : `reduces net worth by ${money(Math.abs(c.effect))}`;
+    lines.push(`  - ${c.label}: ${direction} — ${c.note}`);
   }
   lines.push("- Movements that do NOT change net worth (they only move money between places):");
   for (const m of rec.neutralMovements) {
