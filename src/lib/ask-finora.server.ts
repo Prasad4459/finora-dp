@@ -727,9 +727,7 @@ function investMoreTitle(additionalMonthly: number, s: FinanceSnapshot): string 
 }
 
 export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): string {
-  const s = ctx.snapshot;
-  const lines: string[] = [];
-  return buildContextLines(ctx, outcome, s, lines).join("\n");
+  return buildContextLines(ctx, outcome).join("\n");
 }
 
 /** MARKET INVESTMENTS block — valuation facts only, never projections. */
@@ -794,12 +792,7 @@ function todayBlock(ctx: AskContext): string[] {
   return lines;
 }
 
-function buildContextLines(
-  ctx: AskContext,
-  outcome: ScenarioOutcome,
-  _s: FinanceSnapshot,
-  _lines: string[],
-): string[] {
+function buildContextLines(ctx: AskContext, outcome: ScenarioOutcome): string[] {
   const s = ctx.snapshot;
   const lines: string[] = [];
 
