@@ -14,6 +14,7 @@ import { todayISO } from "@/lib/date-in";
 import { formatINR } from "@/lib/format";
 import { FREQUENCY_LABEL, FREQUENCY_OPTIONS, type Frequency } from "@/services/bills";
 import { COMPOUNDING_OPTIONS, instrumentMeta, instrumentPriceUnit, type InstrumentField } from "@/services/instruments";
+import { allowedSourcesFor } from "@/services/market-refresh";
 import { useFinance, type EditTarget } from "@/store/finance-store";
 import type { EntityKind } from "@/types/finance";
 
@@ -190,7 +191,8 @@ export function EntityDialogs({
       type: "text",
       placeholder: "e.g. 120503 (AMFI scheme code) or RELIANCE",
       hint: "Used to fetch the daily price. AMFI scheme code for mutual funds, ticker for stocks and ETFs.",
-      showWhen: shows("symbol"),
+      // A ₹/gram gold reference price needs no ticker.
+      showWhen: (v) => shows("symbol")(v) && String(v.priceSource ?? "") !== "gold_inr",
     },
     exchange: {
       key: "exchange",
@@ -202,15 +204,31 @@ export function EntityDialogs({
         { value: "BSE", label: "BSE" },
       ],
       placeholder: "Select exchange",
-      showWhen: (v) => shows("exchange")(v) && String(v.priceSource ?? "") !== "amfi",
+      showWhen: (v) =>
+        shows("exchange")(v) &&
+        !["amfi", "gold_inr"].includes(String(v.priceSource ?? "")),
     },
     priceSource: {
       key: "priceSource",
       label: "Price source",
       type: "select",
       options: ["manual", "amfi", "nse", "bse"],
+      // Only sources that make sense for THIS instrument are offered:
+      // gold_inr for Gold / Digital Gold, NSE/BSE for Gold ETFs, AMFI for
+      // Gold Funds. Silver and SGBs stay manual.
+      dynamicOptions: (v) => [
+        { value: "manual", label: "Manual" },
+        ...allowedSourcesFor(String(v.type ?? "")).map((s) => ({
+          value: s,
+          label: s === "gold_inr" ? "24K gold reference (₹/gram)" : s.toUpperCase(),
+        })),
+      ],
       default: "manual",
       hint: "Only AMFI / NSE / BSE holdings are refreshed automatically.",
+      dynamicHint: (v) =>
+        String(v.priceSource ?? "") === "gold_inr"
+          ? "24K reference valuation: grams × 24K gold price per gram. Excludes making charges, GST and dealer spreads."
+          : "Only AMFI / NSE / BSE holdings are refreshed automatically.",
       showWhen: shows("priceSource"),
     },
     purchase: { key: "purchase", label: "Invested amount (₹)", type: "number", required: true, showWhen: shows("purchase") },
@@ -234,6 +252,10 @@ export function EntityDialogs({
       type: "number",
       placeholder: "Leave empty to use your average cost",
       hint: "Per unit, not the total value. Current value = units × this price.",
+      dynamicHint: (v) =>
+        instrumentPriceUnit(String(v.type ?? "")) === "per_gram"
+          ? "Per gram, not the total value. Current value = grams × this price (24K reference)."
+          : "Per unit, not the total value. Current value = units × this price.",
       showWhen: shows("lastPrice"),
     },
     current: { key: "current", label: "Current value (₹)", type: "number", required: true, showWhen: shows("current") },
