@@ -875,6 +875,53 @@ function marketBlock(ctx: AskContext): string[] {
 }
 
 /** TODAY block — recorded ledger activity for the IST day, aggregates only. */
+function reconciliationBlock(ctx: AskContext): string[] {
+  const rec = ctx.reconciliation;
+  const p = ctx.portfolio;
+  const lines: string[] = ["", `NET-WORTH RECONCILIATION for ${rec.label} (${rec.from} to ${rec.to}) — the ONLY valid basis for explaining a net-worth change. Never substitute "income minus expenses":`];
+  lines.push(
+    `- Beginning net worth: ${money(rec.beginningNetWorth)} (${rec.beginningIsVerified ? "verified" : "DERIVED by working backwards from today's verified net worth — say it is derived, not measured"})`,
+  );
+  lines.push(`- Ending net worth: ${money(rec.endingNetWorth)} (verified, today's position)`);
+  lines.push(
+    rec.verifiedChange === null
+      ? `- Net-worth change explained by the identified components: ${money(rec.explainedChange)}. There is no independently verified beginning net worth to check this against.`
+      : `- Verified net-worth change: ${money(rec.verifiedChange)}; explained by components: ${money(rec.explainedChange)}`,
+  );
+  lines.push("- Components that DO change net worth:");
+  for (const c of rec.components) {
+    lines.push(`  - ${c.label}: ${money(c.effect)} — ${c.note}`);
+  }
+  lines.push("- Movements that do NOT change net worth (they only move money between places):");
+  for (const m of rec.neutralMovements) {
+    lines.push(`  - ${m.label}: ${money(m.amount)} — ${m.note}`);
+  }
+  lines.push(
+    rec.unexplained === null
+      ? "- Unexplained difference: NOT MEASURABLE without a verified beginning net worth."
+      : rec.reconciles
+        ? `- Reconciliation: the components fully explain the change (residual ${money(rec.unexplained)}).`
+        : `- UNEXPLAINED DIFFERENCE: ${money(rec.unexplained)}. Report this number and say the available records do not fully explain the change. Do NOT invent a cause.`,
+  );
+  for (const n of rec.notes) lines.push(`- Note: ${n}`);
+  lines.push("");
+  lines.push("PORTFOLIO CHANGE (contribution vs withdrawal vs market movement):");
+  lines.push(`- Money contributed this period: ${money(p.contributed)}`);
+  lines.push(`- Money withdrawn this period: ${money(p.withdrawn)}`);
+  lines.push(
+    p.marketChange === null
+      ? "- Market gain/loss over this period: NOT MEASURABLE — no holding has a valuation recorded before this period started."
+      : `- Market gain/loss over this period: ${money(p.marketChange)} (unrealised, not income)`,
+  );
+  lines.push(
+    p.totalChange === null
+      ? "- Resulting portfolio-value change: cannot be stated because the market component is unknown."
+      : `- Resulting portfolio-value change: ${money(p.totalChange)}. Attribution sentence to use: ${p.explanation}`,
+  );
+  return lines;
+}
+
+/** TODAY block — recorded ledger activity for the IST day, aggregates only. */
 function todayBlock(ctx: AskContext): string[] {
   const t = ctx.today;
   const lines = ["", `TODAY'S RECORDED ACTIVITY (${t.date}, Asia/Kolkata) — TRANSACTIONS, not market movement:`];
@@ -924,6 +971,7 @@ function buildContextLines(ctx: AskContext, outcome: ScenarioOutcome): string[] 
 
   lines.push(...marketBlock(ctx));
   lines.push(...todayBlock(ctx));
+  lines.push(...reconciliationBlock(ctx));
 
   if (s.liabilities.length) {
     lines.push("");
