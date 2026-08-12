@@ -64,6 +64,7 @@ export type Database = {
           compounding: string | null
           created_at: string
           current_value: number
+          exchange: string | null
           folio_number: string | null
           id: string
           institution: string | null
@@ -76,9 +77,12 @@ export type Database = {
           maturity_value: number | null
           name: string
           notes: string | null
+          price_source: string
+          price_unit: string
           purchase_date: string | null
           purchase_value: number
           quantity: number | null
+          symbol: string | null
           type: Database["public"]["Enums"]["asset_type"]
           units: number | null
           updated_at: string
@@ -89,6 +93,7 @@ export type Database = {
           compounding?: string | null
           created_at?: string
           current_value?: number
+          exchange?: string | null
           folio_number?: string | null
           id?: string
           institution?: string | null
@@ -101,9 +106,12 @@ export type Database = {
           maturity_value?: number | null
           name: string
           notes?: string | null
+          price_source?: string
+          price_unit?: string
           purchase_date?: string | null
           purchase_value?: number
           quantity?: number | null
+          symbol?: string | null
           type: Database["public"]["Enums"]["asset_type"]
           units?: number | null
           updated_at?: string
@@ -114,6 +122,7 @@ export type Database = {
           compounding?: string | null
           created_at?: string
           current_value?: number
+          exchange?: string | null
           folio_number?: string | null
           id?: string
           institution?: string | null
@@ -126,9 +135,12 @@ export type Database = {
           maturity_value?: number | null
           name?: string
           notes?: string | null
+          price_source?: string
+          price_unit?: string
           purchase_date?: string | null
           purchase_value?: number
           quantity?: number | null
+          symbol?: string | null
           type?: Database["public"]["Enums"]["asset_type"]
           units?: number | null
           updated_at?: string

@@ -83,7 +83,8 @@ export type BillInput = {
 
 export type TransferInput = { fromWalletId: string; toWalletId: string; amount: number; date: string; notes?: string };
 export type InvestmentInput = {
-  asset: string;
+  /** Asset UUID — holdings are NEVER identified by name. */
+  assetId: string;
   /** Wallet UUID. Empty when the contribution is employer-funded (EPF / NPS). */
   walletId?: string;
   amount: number;
@@ -96,7 +97,8 @@ export type InvestmentInput = {
 };
 /** Selling / withdrawing an investment: cash returns to a wallet. */
 export type RedemptionInput = {
-  asset: string;
+  /** Asset UUID — holdings are NEVER identified by name. */
+  assetId: string;
   walletId: string;
   amount: number;
   date: string;
@@ -105,7 +107,8 @@ export type RedemptionInput = {
 };
 /** A recurring contribution schedule (SIP, RD instalment, yearly deposit). */
 export type SipInput = {
-  asset: string;
+  /** Asset UUID — holdings are NEVER identified by name. */
+  assetId: string;
   walletId: string;
   amount: number;
   frequency: string;
@@ -233,6 +236,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const goals = useMemo(() => goalsData.rows.map(toGoal), [goalsData.rows]);
   const bills = useMemo(() => billsData.rows.map(toBill), [billsData.rows]);
   const assetName = (id: string) => assetsData.rows.find((a) => a.id === id)?.name ?? "—";
+  /** Holdings are resolved by UUID only — never by display name. */
+  const requireAsset = (id: string | null | undefined) => {
+    const row = id ? assetsData.rows.find((a) => a.id === id) : undefined;
+    if (!row) throw new Error("Select a holding");
+    return row;
+  };
   const contributions = useMemo<InvestmentContribution[]>(
     () =>
       contributionsData.rows.map((c) => ({
@@ -392,6 +401,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const assetPayload = (v: AssetInput) => {
     const { units, avgCost, lastPrice, current } = unitValuation(v);
+    // A price timestamp is only written when the user actually supplied a
+    // price. A cost-derived fallback is NOT a valuation, so it stays null.
+    const userPriced = numOrNull(v.lastPrice) !== null;
     return {
     name: v.name,
     type: assetTypeFromLabel(v.type),
@@ -402,6 +414,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     units,
     avg_cost: avgCost,
     last_price: lastPrice,
+    last_price_at: userPriced ? new Date().toISOString() : null,
+    symbol: v.symbol || null,
+    exchange: v.exchange || null,
+    price_source: v.priceSource || "manual",
+    price_unit: v.priceUnit || (instrumentMeta(v.type).assetClass === "gold" ? "per_gram" : "per_unit"),
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,
@@ -510,8 +527,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     // Investment: cash leaves the wallet and lands in an existing asset.
     addInvestment: (v) =>
       run(async () => {
-        const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
-        if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        const asset = requireAsset(v.assetId);
         // EMPLOYER-FUNDED CONTRIBUTIONS (EPF / NPS)
         // The asset grows but the user's bank balance never moved, so the
         // transaction carries no wallet: the trigger then skips the debit.
@@ -522,7 +538,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           transaction_date: v.date || todayISODate(),
           wallet_id: walletId,
           asset_id: asset.id,
-          payee: v.asset,
+          payee: asset.name,
           units: v.units ?? null,
           price_per_unit: v.pricePerUnit ?? null,
           category_id: await resolveCategoryId("Investment", "expense"),
@@ -534,8 +550,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     // The proceeds are NOT income — only the realised gain is performance.
     addRedemption: (v) =>
       run(async () => {
-        const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
-        if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        const asset = requireAsset(v.assetId);
         const held = Number((asset as { units?: number | null }).units ?? 0);
         if (v.units && held > 0 && v.units > held + 1e-6) {
           throw new Error(`You only hold ${held} units of ${asset.name}`);
@@ -546,7 +561,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           transaction_date: v.date || todayISODate(),
           wallet_id: requireWalletId(v.walletId, "Destination account"),
           asset_id: asset.id,
-          payee: v.asset,
+          payee: asset.name,
           units: v.units ?? null,
           price_per_unit: v.units ? Number((v.amount / v.units).toFixed(4)) : null,
           notes: v.notes || null,
@@ -558,8 +573,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     // A schedule is a DEFINITION: no future transactions are materialised.
     addSip: (v) =>
       run(async () => {
-        const asset = assetsData.rows.find((a) => a.name.toLowerCase() === v.asset.toLowerCase());
-        if (!asset) throw new Error(`Asset "${v.asset}" was not found`);
+        const asset = requireAsset(v.assetId);
         contributionsData.create.mutate({
           asset_id: asset.id,
           wallet_id: requireWalletId(v.walletId, "Debit account"),

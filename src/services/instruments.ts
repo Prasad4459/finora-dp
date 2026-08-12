@@ -213,6 +213,14 @@ export function accruedValue(input: {
   return Math.round(value);
 }
 
+/**
+ * A price is only usable when it is a finite, strictly positive number.
+ * Guards every valuation write: a null/zero/NaN price from a failed lookup
+ * must never overwrite a good current value.
+ */
+export const isValidPrice = (p: unknown): p is number =>
+  typeof p === "number" && Number.isFinite(p) && p > 0;
+
 /** Market value of a unit-based holding, when a last price is known. */
 export const marketValue = (units: number | null, lastPrice: number | null) =>
   units && lastPrice ? Math.round(units * lastPrice) : null;
@@ -258,6 +266,13 @@ export function derivedValue(h: HoldingInput, asOfISO: string): number {
     });
   return h.current;
 }
+
+/**
+ * SINGLE SOURCE OF CURRENT VALUE.
+ * Both the Investments page and the net-worth engine must call this — nothing
+ * may read `asset.current` directly for display or totals.
+ */
+export const assetCurrentValue = (h: HoldingInput, asOfISO: string) => derivedValue(h, asOfISO);
 
 export const gainOf = (value: number, invested: number) => ({
   gain: value - invested,

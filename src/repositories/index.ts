@@ -3,6 +3,8 @@ export { walletsRepo } from "./wallets.repo";
 export { categoriesRepo } from "./categories.repo";
 export { transactionsRepo, DEFAULT_PAGE_SIZE } from "./transactions.repo";
 export { assetsRepo } from "./assets.repo";
+export type { PriceUpdate } from "./assets.repo";
+export { assetValuationsRepo } from "./asset-valuations.repo";
 export { liabilitiesRepo } from "./liabilities.repo";
 export { goalsRepo } from "./goals.repo";
 export { budgetsRepo } from "./budgets.repo";

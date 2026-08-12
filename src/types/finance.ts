@@ -54,6 +54,15 @@ export type Asset = {
   maturityValue?: number | null;
   folio?: string | null;
   institution?: string | null;
+  /* ---- market identity (Release 7B; used by future price refresh) ---- */
+  symbol?: string | null;
+  exchange?: string | null;
+  /** nse | bse | amfi | gold_inr | manual */
+  priceSource?: string | null;
+  /** per_unit | per_gram */
+  priceUnit?: string | null;
+  /** When last_price was last set. Null for holdings never priced. */
+  lastPriceAt?: string | null;
   /** False once a holding has been fully redeemed (kept for history). */
   isActive?: boolean;
 };
