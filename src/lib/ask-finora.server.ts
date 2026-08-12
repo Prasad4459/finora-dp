@@ -660,6 +660,11 @@ export function followUpsFor(intent: Intent, ctx: AskContext, outcome: ScenarioO
     out.push("How can I reach ₹1 crore?");
     out.push("When will I become debt free?");
     out.push("What is my weakest financial area?");
+  } else if (intent === "market_performance" || intent === "earned_today" || intent === "net_worth_change") {
+    out.push("What is my total unrealised gain?");
+    if (ctx.market.holdings.length > 1) out.push("Which investment performed best?");
+    else out.push("Why did my net worth change?");
+    out.push("What if I invest ₹10,000 more every month?");
   } else {
     out.push("How can I reach ₹50L?");
     if (s.liabilities.length > 0) out.push("When will I become debt free?");
