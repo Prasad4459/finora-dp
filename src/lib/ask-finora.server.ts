@@ -59,6 +59,15 @@ import {
   type MarketContext,
   type ValuationPoint,
 } from "@/services/market-context";
+import {
+  attributePortfolioChange,
+  emptyFlows,
+  marketChangeOverPeriod,
+  reconcileNetWorth,
+  type PeriodFlows,
+  type PortfolioChange,
+  type Reconciliation,
+} from "@/services/reconciliation";
 import type { Asset } from "@/types/finance";
 
 type Db = SupabaseClient<Database>;
@@ -130,6 +139,10 @@ export type AskContext = {
   topCategories: Array<{ name: string; spent: number }>;
   /** Market-valued holdings + valuation history (Release 7D). */
   market: MarketContext;
+  /** Verified net-worth reconciliation for the current month (Release 7D). */
+  reconciliation: Reconciliation;
+  /** Portfolio change attribution: contributions vs withdrawals vs market. */
+  portfolio: PortfolioChange;
   /** Recorded activity for today (IST), by ledger type. Aggregates only. */
   today: {
     date: string;
@@ -168,6 +181,34 @@ function aggregatesFromRows(rows: Array<Record<string, unknown>>): Map<string, M
     map.set(key, agg);
   }
   return map;
+}
+
+/**
+ * Ledger flows for ONE month, taken from the same Postgres aggregate rows.
+ * Unlike MonthAggregate this keeps redemptions, because a withdrawal must be
+ * reported separately and must never be folded into income.
+ */
+function flowsForMonth(rows: Array<Record<string, unknown>>, key: string): PeriodFlows {
+  const flows = emptyFlows();
+  for (const r of rows) {
+    if (monthKeyOf({ year: Number(r['y']), month: Number(r['m']) }) !== key) continue;
+    const total = num(r['total']);
+    switch (String(r['tx_type'])) {
+      case "income": flows.income += total; break;
+      case "dividend": flows.dividend += total; break;
+      case "refund": flows.refund += total; break;
+      case "expense": flows.expense += total; break;
+      case "investment": flows.investmentContribution += total; break;
+      case "redemption": flows.investmentWithdrawal += total; break;
+      case "transfer": flows.transfer += total; break;
+      case "emi":
+        flows.emiPaid += total;
+        flows.emiInterest += num(r['interest_total']);
+        flows.emiPrincipal += num(r['principal_total']);
+        break;
+    }
+  }
+  return flows;
 }
 
 /** Reads the signed-in user's position. RLS scopes every query to that user. */
