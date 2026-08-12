@@ -77,6 +77,18 @@ describe("Release 7C — daily market valuation", () => {
     expect(parseAmfiDate("11-Aug-2026")).toBe("2026-08-11");
   });
 
+  it("parses the live CRLF feed layout, including newer JioBlackRock schemes", () => {
+    const feed = parseAmfiFeed(
+      [
+        "Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Net Asset Value;Date",
+        " ",
+        "Open Ended Schemes(Equity Scheme - Flexi Cap Fund)",
+        "153859;INF22M001093;-;JioBlackRock Flexi Cap Fund - Direct Plan - Growth Option;10.1680;11-Aug-2026",
+      ].join("\r\n"),
+    );
+    expect(feed.get("153859")).toEqual({ price: 10.168, asOf: "2026-08-11" });
+  });
+
   it("a refreshed price flows into current value, portfolio and net worth", () => {
     const before: Asset = {
       id: "s1", name: "Reliance", type: "Stocks", purchase: 12_000, current: 14_000,
