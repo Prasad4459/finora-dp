@@ -22,7 +22,7 @@ type Common = {
 /** A select option may carry a UUID value plus a rich display label. */
 export type SelectOption = { value: string; label: string; hint?: string };
 
-const normalizeOptions = (options: readonly (string | SelectOption)[]): SelectOption[] =>
+export const normalizeOptions = (options: readonly (string | SelectOption)[]): SelectOption[] =>
   options
     // Radix throws when a SelectItem has an empty value; an empty value means
     // "no selection" and is represented by the placeholder instead.
