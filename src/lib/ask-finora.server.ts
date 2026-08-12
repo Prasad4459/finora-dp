@@ -410,6 +410,8 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
     bills,
     contributions,
     topCategories,
+    market,
+    today: todayActivity,
     hasData:
       accounts.length > 0 ||
       assets.length > 0 ||
