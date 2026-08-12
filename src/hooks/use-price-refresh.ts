@@ -52,7 +52,12 @@ export function usePriceRefresh(assets: RefreshableAsset[]) {
           continue;
         }
         try {
-          await assetsRepo.updatePrice(q.id, { price: q.price, asOf: q.asOf, source: q.source });
+          await assetsRepo.updatePrice(q.id, {
+            price: q.price,
+            asOf: q.asOf,
+            source: q.source,
+            priceUnit: q.priceUnit ?? null,
+          });
           updated += 1;
         } catch {
           // A rejected write keeps the last known good valuation.

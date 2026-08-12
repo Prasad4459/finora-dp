@@ -66,8 +66,8 @@ describe("Release 7E-1 — gold price-unit safety", () => {
     expect(allowedSourcesFor("Gold Fund")).toEqual(["amfi"]);
     expect(allowedSourcesFor("Silver")).toEqual([]);
     expect(allowedSourcesFor("Sovereign Gold Bond")).toEqual([]);
-    // gold_inr is not wired to any provider yet
-    expect(isRefreshable({ id: "g1", name: "Gold", type: "Gold", units: 50, symbol: "XAU", priceSource: "gold_inr", priceUnit: "per_gram" })).toBe(false);
+    // Release 7E-2 wired gold_inr: physical gold is now refreshable.
+    expect(isRefreshable({ id: "g1", name: "Gold", type: "Gold", units: 50, symbol: "XAU", priceSource: "gold_inr", priceUnit: "per_gram" })).toBe(true);
     // an equity source can never reach physical gold
     expect(isRefreshable({ id: "g2", name: "Gold", type: "Gold", units: 50, symbol: "GOLDBEES", priceSource: "nse", priceUnit: "per_gram" })).toBe(false);
     // an AMFI source can never reach a Gold ETF

@@ -4,7 +4,7 @@
 import { instrumentMeta, isValidPrice, priceUnitMatches } from "@/services/instruments";
 
 /** Price sources that a provider can actually refresh today. */
-export const REFRESHABLE_SOURCES = ["amfi", "nse", "bse"] as const;
+export const REFRESHABLE_SOURCES = ["amfi", "nse", "bse", "gold_inr"] as const;
 export type RefreshableSource = (typeof REFRESHABLE_SOURCES)[number];
 
 /** Sources a future provider could serve, even if not wired yet. */
@@ -27,8 +27,11 @@ export const SOURCES_BY_INSTRUMENT: Record<string, readonly KnownSource[]> = {
   "Sovereign Gold Bond": [],
 };
 
+/** Sources available to instruments with no explicit entry above. */
+const GENERIC_SOURCES: readonly KnownSource[] = ["amfi", "nse", "bse"];
+
 export const allowedSourcesFor = (type: string): readonly KnownSource[] =>
-  SOURCES_BY_INSTRUMENT[type] ?? (REFRESHABLE_SOURCES as readonly KnownSource[]);
+  SOURCES_BY_INSTRUMENT[type] ?? GENERIC_SOURCES;
 
 export type RefreshableAsset = {
   id: string;
@@ -58,6 +61,8 @@ export type Quote = {
   /** ISO date (YYYY-MM-DD) the price is valid for. */
   asOf: string;
   source: RefreshableSource;
+  /** Unit the quote is expressed in ("per_gram" for gold_inr). */
+  priceUnit?: string;
 };
 
 export type QuoteFailure = { id: string; reason: string };
@@ -79,6 +84,8 @@ export function isRefreshable(a: RefreshableAsset): boolean {
   // A holding whose stored unit contradicts its instrument is never repriced.
   if (a.priceUnit != null && a.priceUnit !== "" && !priceUnitMatches(a.type, a.priceUnit))
     return false;
+  // A ₹/gram gold reference price needs no ticker — the metal IS the symbol.
+  if (source === "gold_inr") return true;
   return Boolean(a.symbol && String(a.symbol).trim());
 }
 
@@ -86,7 +93,7 @@ export function toPriceRequest(a: RefreshableAsset): PriceRequest {
   return {
     id: a.id,
     name: a.name,
-    symbol: String(a.symbol).trim(),
+    symbol: String(a.symbol ?? "").trim(),
     exchange: a.exchange ? String(a.exchange).trim().toUpperCase() : null,
     source: String(a.priceSource).toLowerCase() as RefreshableSource,
   };
