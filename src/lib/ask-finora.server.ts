@@ -729,6 +729,79 @@ function investMoreTitle(additionalMonthly: number, s: FinanceSnapshot): string 
 export function buildContextBlock(ctx: AskContext, outcome: ScenarioOutcome): string {
   const s = ctx.snapshot;
   const lines: string[] = [];
+  return buildContextLines(ctx, outcome, s, lines).join("\n");
+}
+
+/** MARKET INVESTMENTS block — valuation facts only, never projections. */
+function marketBlock(ctx: AskContext): string[] {
+  const mkt = ctx.market;
+  const lines: string[] = [];
+  if (!mkt.hasMarketData) {
+    lines.push("");
+    lines.push(
+      "MARKET INVESTMENTS: none recorded. There are no market-valued holdings (stocks, mutual funds, ETFs, gold), so there is no market valuation or unrealised gain to report.",
+    );
+    return lines;
+  }
+  lines.push("");
+  lines.push(
+    "MARKET INVESTMENTS — valuation FACTS from this user's own holdings. These are UNREALISED market values, not income and not cash:",
+  );
+  lines.push(
+    `- Portfolio: invested ${money(mkt.invested)}, current market value ${money(mkt.value)}, unrealised gain/loss ${money(mkt.gain)} (${mkt.gainPct}%)`,
+  );
+  lines.push(
+    mkt.valuationChange === null
+      ? "- Market valuation change: NOT AVAILABLE — no holding has two recorded valuations yet, so the change since a previous valuation cannot be calculated. Never invent a previous price."
+      : `- Market valuation change since the previous recorded valuation: ${money(mkt.valuationChange)}${mkt.valuationChangeToday === null ? " (the latest valuations were NOT recorded today, so do NOT call this today's change)" : ` (of which ${money(mkt.valuationChangeToday)} comes from valuations recorded today)`}`,
+  );
+  for (const h of mkt.holdings) {
+    const id = [h.symbol ? `code ${h.symbol}` : null, h.exchange, `price source ${h.priceSource}`]
+      .filter(Boolean)
+      .join(", ");
+    lines.push(
+      `- ${h.name} (${h.type}${id ? `, ${id}` : ""}): ${h.units ?? "unknown"} units at ${h.price === null ? "no recorded price" : money(h.price)} per unit = current value ${money(h.value)}; invested ${money(h.invested)}; unrealised gain/loss ${money(h.gain)} (${h.gainPct}%)${h.lastPriceAt ? `; price last updated ${h.lastPriceAt.slice(0, 10)}` : "; price never updated"}`,
+    );
+    if (h.valuationChange === null) {
+      lines.push(
+        `  - Valuation history: ${h.latestValuationDate ? `only one valuation (${h.latestValuationDate}, ${money(h.latestValuationValue ?? 0)})` : "no recorded valuations"}. Say: current market value is ${money(h.value)}, but there is no previous valuation yet to calculate the change.`,
+      );
+    } else {
+      lines.push(
+        `  - Valuation history: ${h.previousValuationDate} ${money(h.previousValuationValue ?? 0)} -> ${h.latestValuationDate} ${money(h.latestValuationValue ?? 0)}; market valuation change ${money(h.valuationChange)}${h.changeIsToday ? " (latest valuation was recorded today)" : " (the latest valuation was NOT recorded today — describe it as the change between those two dates)"}`,
+      );
+    }
+  }
+  if (mkt.best) lines.push(`- Best performer by unrealised return: ${mkt.best.name} (${mkt.best.gainPct}%)`);
+  if (mkt.worst) lines.push(`- Weakest performer by unrealised return: ${mkt.worst.name} (${mkt.worst.gainPct}%)`);
+  return lines;
+}
+
+/** TODAY block — recorded ledger activity for the IST day, aggregates only. */
+function todayBlock(ctx: AskContext): string[] {
+  const t = ctx.today;
+  const lines = ["", `TODAY'S RECORDED ACTIVITY (${t.date}, Asia/Kolkata) — TRANSACTIONS, not market movement:`];
+  if (t.count === 0) {
+    lines.push("- No transactions were recorded today: income ₹0, expenses ₹0, investment contributions ₹0.");
+  } else {
+    lines.push(`- Income ${money(t.income)}; dividends ${money(t.dividend)}; refunds ${money(t.refund)}`);
+    lines.push(`- Expenses ${money(t.expense)}; EMI ${money(t.emi)}; transfers ${money(t.transfer)}`);
+    lines.push(`- Investment contributions ${money(t.investment)}; redemptions ${money(t.redemption)}`);
+  }
+  lines.push(
+    "- Investment contributions are money MOVED into investments, never profit. Market valuation change is NOT income and NOT a transaction.",
+  );
+  return lines;
+}
+
+function buildContextLines(
+  ctx: AskContext,
+  outcome: ScenarioOutcome,
+  _s: FinanceSnapshot,
+  _lines: string[],
+): string[] {
+  const s = ctx.snapshot;
+  const lines: string[] = [];
 
   lines.push(`TODAY: ${todayISO()} (Asia/Kolkata). CURRENT MONTH: ${ctx.monthLabel}.`);
   lines.push("");
