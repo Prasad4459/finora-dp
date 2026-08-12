@@ -473,7 +473,7 @@ export function detectIntent(question: string): Intent {
   if (
     /(mutual fund|mutual funds|portfolio|holding|nav|market value|unrealised|unrealized)/.test(q) ||
     (/(invest|investment|investments|stock|stocks|etf|gold|crypto)/.test(q) &&
-      /(gain|gained|lose|lost|loss|return|returns|worth|value|perform|performed|performance|up|down|profit|changed|change)/.test(q))
+      /(gain|gained|lose|lost|loss|return|returns|worth|value|perform|performed|performance|\bup\b|\bdown\b|profit|changed|change)/.test(q))
   ) {
     return "market_performance";
   }
