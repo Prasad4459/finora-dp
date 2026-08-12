@@ -109,7 +109,9 @@ export function EntityDialogs({
       requiredMessage: SELECT_ACCOUNT,
       ...extra,
     }) as FieldDef;
-  const assetNames = f.assets.map((a) => a.name);
+  // Holdings are selected by UUID: financial ownership must never be resolved
+  // by display name (two holdings can share a name).
+  const assetOptions = f.assets.map((a) => ({ value: a.id, label: a.name, hint: a.type }));
   const liabilityNames = f.liabilities.map((l) => l.name);
   const goalNames = f.goals.map((g) => g.name);
   const today = todayISO();
@@ -275,7 +277,7 @@ export function EntityDialogs({
   ];
 
   const investmentFields: FieldDef[] = [
-    { key: "asset", label: "Invest into (holding)", type: "select", options: assetNames, required: true },
+    { key: "assetId", label: "Invest into (holding)", type: "select", options: assetOptions, required: true, placeholder: "Select holding", requiredMessage: "Select a holding" },
     { key: "employerFunded", label: "Employer funded", type: "switch", hint: "EPF / NPS employer share — no money leaves your accounts" },
     walletField("walletId", "Paid from account", { showWhen: (v) => !v.employerFunded }),
     { key: "amount", label: "Amount (₹)", type: "number", required: true },
@@ -286,7 +288,7 @@ export function EntityDialogs({
   ];
 
   const redemptionFields: FieldDef[] = [
-    { key: "asset", label: "Sell / withdraw from", type: "select", options: assetNames, required: true },
+    { key: "assetId", label: "Sell / withdraw from", type: "select", options: assetOptions, required: true, placeholder: "Select holding", requiredMessage: "Select a holding" },
     walletField("walletId", "Credited to account"),
     { key: "units", label: "Units sold (optional)", type: "number" },
     { key: "amount", label: "Proceeds received (₹)", type: "number", required: true },
@@ -295,7 +297,7 @@ export function EntityDialogs({
   ];
 
   const sipFields: FieldDef[] = [
-    { key: "asset", label: "Contribute to", type: "select", options: assetNames, required: true },
+    { key: "assetId", label: "Contribute to", type: "select", options: assetOptions, required: true, placeholder: "Select holding", requiredMessage: "Select a holding" },
     walletField("walletId", "Debit from account"),
     { key: "amount", label: "Instalment amount (₹)", type: "number", required: true },
     { key: "frequency", label: "Frequency", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true },
@@ -432,7 +434,7 @@ export function EntityDialogs({
       <FormDialog open={open === "investment"} onClose={onClose} title="Record investment" fields={investmentFields}
         onSubmit={(v) =>
           f.addInvestment({
-            asset: v.asset,
+            assetId: v.assetId,
             walletId: v.walletId,
             amount: Number(v.amount),
             date: v.date || today,
@@ -446,7 +448,7 @@ export function EntityDialogs({
       <FormDialog open={open === "redemption"} onClose={onClose} title="Redeem / sell investment" fields={redemptionFields}
         onSubmit={(v) =>
           f.addRedemption({
-            asset: v.asset,
+            assetId: v.assetId,
             walletId: v.walletId,
             amount: Number(v.amount),
             units: v.units ? Number(v.units) : undefined,
@@ -458,7 +460,7 @@ export function EntityDialogs({
       <FormDialog open={open === "sip"} onClose={onClose} title="Schedule a contribution" fields={sipFields}
         onSubmit={(v) =>
           f.addSip({
-            asset: v.asset,
+            assetId: v.assetId,
             walletId: v.walletId,
             amount: Number(v.amount),
             frequency: v.frequency || "Monthly",
