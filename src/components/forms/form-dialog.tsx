@@ -23,7 +23,11 @@ type Common = {
 export type SelectOption = { value: string; label: string; hint?: string };
 
 const normalizeOptions = (options: readonly (string | SelectOption)[]): SelectOption[] =>
-  options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
+  options
+    // Radix throws when a SelectItem has an empty value; an empty value means
+    // "no selection" and is represented by the placeholder instead.
+    .map((o) => (typeof o === "string" ? { value: o, label: o } : o))
+    .filter((o) => o.value !== "");
 
 export type FieldDef =
   | ({ key: string; label: string; type: "text" | "number" | "date"; required?: boolean; placeholder?: string; default?: string } & Common)
