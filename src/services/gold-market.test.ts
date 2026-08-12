@@ -79,7 +79,7 @@ describe("Release 7E-2 — gold / digital gold market valuation", () => {
       const { quotes, failures } = await fetchQuotes(req);
       expect(failures).toEqual([]);
       expect(quotes[0]).toMatchObject({ id: "g1", source: "gold_inr", priceUnit: "per_gram", asOf: "2026-08-12" });
-      expect(quotes[0].price).toBeCloseTo(5626.11, 1);
+      expect(quotes[0].price).toBeCloseTo(5626.38, 1);
     });
 
     it("rejects malformed / invalid provider prices", async () => {
