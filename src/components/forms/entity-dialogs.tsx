@@ -214,11 +214,23 @@ export function EntityDialogs({
       showWhen: shows("priceSource"),
     },
     purchase: { key: "purchase", label: "Invested amount (₹)", type: "number", required: true, showWhen: shows("purchase") },
-    units: { key: "units", label: "Units held", type: "number", showWhen: shows("units") },
+    units: {
+      key: "units",
+      // Physical/digital metal is held in grams; funds and ETFs in units.
+      label: "Units held",
+      dynamicLabel: (v) =>
+        instrumentPriceUnit(String(v.type ?? "")) === "per_gram" ? "Grams held" : "Units held",
+      type: "number",
+      showWhen: shows("units"),
+    },
     avgCost: { key: "avgCost", label: "Average cost per unit (₹)", type: "number", showWhen: shows("avgCost") },
     lastPrice: {
       key: "lastPrice",
       label: "Current NAV / price PER UNIT (₹)",
+      dynamicLabel: (v) =>
+        instrumentPriceUnit(String(v.type ?? "")) === "per_gram"
+          ? "Current price PER GRAM (₹)"
+          : "Current NAV / price PER UNIT (₹)",
       type: "number",
       placeholder: "Leave empty to use your average cost",
       hint: "Per unit, not the total value. Current value = units × this price.",
