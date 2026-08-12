@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, TrendingUp, TrendingDown, Wallet, PiggyBank, CalendarClock, Pencil, ArrowDownLeft, ArrowUpRight, Trash2, Repeat } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, Wallet, PiggyBank, CalendarClock, Pencil, ArrowDownLeft, ArrowUpRight, Trash2, Repeat, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { RemoveInvestmentDialog } from "@/components/finance/remove-investment-dialog";
@@ -12,6 +12,9 @@ import { formatINR, formatDateIN } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { FREQUENCY_LABEL, type Frequency } from "@/services/bills";
 import { instrumentMeta } from "@/services/instruments";
+import { freshness, isRefreshable, latestPricedAt } from "@/services/market-refresh";
+import { todayISO } from "@/lib/date-in";
+import { usePriceRefresh } from "@/hooks/use-price-refresh";
 import { useInvestments } from "@/hooks/use-investments";
 import { useFinance } from "@/store/finance-store";
 
@@ -22,6 +25,12 @@ export function Investments() {
   const { portfolio, schedules } = useInvestments();
   const positive = portfolio.gain >= 0;
   const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+  const today = todayISO();
+  const { refresh, isRefreshing, summary, eligibleCount } = usePriceRefresh(portfolio.holdings);
+  const lastPriced = latestPricedAt(portfolio.holdings);
+  const lastUpdatedLabel = lastPriced
+    ? freshness(lastPriced, today).label
+    : "No market price yet";
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -30,6 +39,10 @@ export function Investments() {
         description="Mutual funds, equities, deposits, small savings and gold — one portfolio."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void refresh()} disabled={isRefreshing}>
+              <RefreshCw className={cn("mr-1 h-4 w-4", isRefreshing && "animate-spin")} />
+              {isRefreshing ? "Refreshing…" : "Refresh prices"}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => openDialog("sip")}>
               <Repeat className="mr-1 h-4 w-4" /> Add contribution
             </Button>
