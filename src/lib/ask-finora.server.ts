@@ -354,6 +354,32 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
   const totals = computeTotals({ accounts, assets, liabilities, month });
   const health = computeHealthScore(totals);
 
+  // ---- Net-worth reconciliation for the current IST month (Release 7D) ----
+  // Cash flow, market movement and net-worth movement are computed separately
+  // and only then compared. Nothing here writes or re-values anything.
+  const monthBounds = monthRange(current);
+  const summaryRows = (summaryRes.data ?? []) as Array<Record<string, unknown>>;
+  const monthFlows = flowsForMonth(summaryRows, monthKeyOf(current));
+  const periodMarket = marketChangeOverPeriod(
+    valuations.map((v) => ({ assetId: v.assetId, asOf: v.asOf, value: v.value })),
+    monthBounds.from,
+    monthBounds.to,
+  );
+  const reconciliation = reconcileNetWorth({
+    from: monthBounds.from,
+    to: monthBounds.to,
+    label: monthLongLabel(current),
+    endingNetWorth: totals.netWorth,
+    beginningNetWorth: null, // Finora stores no net-worth snapshots.
+    flows: monthFlows,
+    marketChange: periodMarket.change,
+  });
+  const portfolio = attributePortfolioChange({
+    contributed: monthFlows.investmentContribution,
+    withdrawn: monthFlows.investmentWithdrawal,
+    marketChange: periodMarket.change,
+  });
+
   // Averages over the months that actually have activity — same rule the
   // What-If page uses, so the simulator and the copilot agree.
   const active = series.filter((s) => s.metrics.grossIncome > 0 || s.metrics.cashOutflow > 0);
@@ -452,6 +478,8 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
     contributions,
     topCategories,
     market,
+    reconciliation,
+    portfolio,
     today: todayActivity,
     hasData:
       accounts.length > 0 ||
