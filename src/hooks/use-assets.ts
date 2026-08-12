@@ -1,5 +1,6 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { assetsRepo } from "@/repositories";
+import type { PriceUpdate } from "@/repositories/assets.repo";
 import { CACHE, financeKeys } from "./query-keys";
 import { useEntityMutation } from "./use-entity-mutation";
 import type { AssetInsert, AssetUpdate } from "@/types/database";
@@ -23,6 +24,14 @@ export function useAssets() {
     invalidate: [financeKeys.assets],
     success: "Asset updated",
   });
+  // Intentional price update: writes last_price + last_price_at and appends a
+  // valuation-history row. Invalid prices are rejected by the repository.
+  const updatePrice = useEntityMutation({
+    mutationFn: ({ id, update }: { id: string; update: PriceUpdate }) =>
+      assetsRepo.updatePrice(id, update),
+    invalidate: [financeKeys.assets],
+    success: "Valuation updated",
+  });
   const remove = useEntityMutation({
     mutationFn: (id: string) => assetsRepo.remove(id),
     invalidate: [financeKeys.assets],
@@ -35,5 +44,5 @@ export function useAssets() {
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
-    refetch: () => void query.refetch(), create, update, remove };
+    refetch: () => void query.refetch(), create, update, updatePrice, remove };
 }
