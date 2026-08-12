@@ -99,7 +99,17 @@ export function Investments() {
         </Card>
 
         <Card className="border-border/70 lg:col-span-2">
-          <CardHeader><CardTitle className="text-base font-semibold">Holdings</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base font-semibold">Holdings</CardTitle>
+            <span className="text-xs text-muted-foreground">
+              Last updated: {lastUpdatedLabel}
+              {summary
+                ? ` · ${summary.updated} updated, ${summary.unavailable} unavailable`
+                : eligibleCount > 0
+                  ? ` · ${eligibleCount} tracked`
+                  : ""}
+            </span>
+          </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -133,6 +143,21 @@ export function Investments() {
                           {h.avgCost ? ` · avg ₹${h.avgCost.toFixed(2)}` : ""}
                           {meta.rate && h.rate ? ` · ${h.rate}% p.a.` : ""}
                         </div>
+                        {isRefreshable(h) && (
+                          <div
+                            className={cn(
+                              "mt-0.5 text-[11px]",
+                              freshness(h.lastPriceAt, today).status === "today"
+                                ? "text-primary"
+                                : freshness(h.lastPriceAt, today).status === "unavailable"
+                                  ? "text-destructive"
+                                  : "text-muted-foreground",
+                            )}
+                          >
+                            {freshness(h.lastPriceAt, today).label}
+                            {h.symbol ? ` · ${h.symbol}` : ""}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell><Badge variant="outline" className="text-[10px]">{h.className}</Badge></TableCell>
                       <TableCell className="text-right tabular-nums">{h.units ? h.units : "—"}</TableCell>
