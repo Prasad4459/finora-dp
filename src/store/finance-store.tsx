@@ -418,7 +418,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     symbol: v.symbol || null,
     exchange: v.exchange || null,
     price_source: v.priceSource || "manual",
-    price_unit: v.priceUnit || (instrumentMeta(v.type).assetClass === "gold" ? "per_gram" : "per_unit"),
+    // Price unit is a property of the INSTRUMENT (gold/silver in grams, funds
+    // and ETFs in units) — never of the broader asset class.
+    price_unit: instrumentPriceUnit(v.type),
     interest_rate: numOrNull(v.rate),
     compounding: v.compounding || null,
     maturity_date: v.maturityDate || null,

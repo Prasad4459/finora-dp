@@ -40,7 +40,8 @@ export const assetsRepo = {
 
     // PRICE-UNIT SAFETY: never multiply a per_gram price into a per_unit
     // holding (or the reverse). On any disagreement the stored value is kept.
-    const label = ASSET_LABEL_BY_TYPE[existing.type ?? ""] ?? "Other";
+    const label =
+      ASSET_LABEL_BY_TYPE[(existing.type ?? "") as keyof typeof ASSET_LABEL_BY_TYPE] ?? "Other";
     const incomingUnit = update.priceUnit ?? existing.price_unit ?? instrumentPriceUnit(label);
     if (!priceUnitMatches(label, incomingUnit)) {
       throw new Error("Price unit mismatch — the existing valuation was kept");
