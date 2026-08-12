@@ -236,16 +236,58 @@ export async function buildAskContext(supabase: Db): Promise<AskContext> {
       updated: "",
     }));
 
-  const assets = (assetsRes.data ?? [])
+  // Full asset shape so valuation uses the SAME assetCurrentValue() path as the
+  // Investments page (units × NAV for market assets, accrual for deposits).
+  const assets: Asset[] = (assetsRes.data ?? [])
     .filter((a) => a.is_active !== false)
-    .map((a) => ({
-      id: "",
-      name: a.name,
-      type: ASSET_LABEL[a.type] ?? "Other",
-      purchase: 0,
-      current: num(a.current_value),
-      date: "",
-    }));
+    .map((a) => {
+      const x = a as Record<string, unknown>;
+      const opt = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+      return {
+        id: String(x['id'] ?? ""),
+        name: a.name,
+        type: ASSET_LABEL[a.type] ?? "Other",
+        purchase: num(x['purchase_value']),
+        current: num(a.current_value),
+        date: String(x['purchase_date'] ?? x['created_at'] ?? today).slice(0, 10),
+        units: opt(x['units'] ?? x['quantity']),
+        avgCost: opt(x['avg_cost']),
+        lastPrice: opt(x['last_price']),
+        rate: opt(x['interest_rate']),
+        compounding: (x['compounding'] as string | null) ?? null,
+        maturityDate: (x['maturity_date'] as string | null) ?? null,
+        institution: (x['institution'] as string | null) ?? null,
+        symbol: (x['symbol'] as string | null) ?? null,
+        exchange: (x['exchange'] as string | null) ?? null,
+        priceSource: (x['price_source'] as string | null) ?? "manual",
+        priceUnit: (x['price_unit'] as string | null) ?? "per_unit",
+        lastPriceAt: (x['last_price_at'] as string | null) ?? null,
+        isActive: true,
+      } satisfies Asset;
+    });
+
+  const valuations: ValuationPoint[] = (valuationsRes.data ?? []).map((v) => ({
+    assetId: String((v as Record<string, unknown>)['asset_id'] ?? ""),
+    asOf: String((v as Record<string, unknown>)['as_of'] ?? "").slice(0, 10),
+    value: num((v as Record<string, unknown>)['value']),
+  }));
+  const market = buildMarketContext(assets, valuations, today);
+
+  const todayRows = (todayRes.data ?? []) as Array<{ type: string; amount: unknown }>;
+  const sumToday = (type: string) =>
+    Math.round(todayRows.filter((r) => r.type === type).reduce((s, r) => s + num(r.amount), 0));
+  const todayActivity = {
+    date: today,
+    income: sumToday("income"),
+    dividend: sumToday("dividend"),
+    refund: sumToday("refund"),
+    expense: sumToday("expense"),
+    investment: sumToday("investment"),
+    redemption: sumToday("redemption"),
+    emi: sumToday("emi"),
+    transfer: sumToday("transfer"),
+    count: todayRows.length,
+  };
 
   const liabilities = (liabRes.data ?? [])
     .filter((l) => l.status !== "closed")
