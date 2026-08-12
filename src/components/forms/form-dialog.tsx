@@ -17,6 +17,8 @@ type Common = {
   hint?: string;
   /** Value-aware label (e.g. "Grams held" for per-gram instruments). */
   dynamicLabel?: (values: Record<string, string | boolean>) => string;
+  /** Value-aware hint (e.g. the 24K reference convention for gold). */
+  dynamicHint?: (values: Record<string, string | boolean>) => string | null;
   /** Shown under the field when it is required but empty on submit. */
   requiredMessage?: string;
 };
@@ -33,7 +35,7 @@ export const normalizeOptions = (options: readonly (string | SelectOption)[]): S
 
 export type FieldDef =
   | ({ key: string; label: string; type: "text" | "number" | "date"; required?: boolean; placeholder?: string; default?: string } & Common)
-  | ({ key: string; label: string; type: "select"; options: readonly (string | SelectOption)[]; required?: boolean; default?: string; placeholder?: string } & Common)
+  | ({ key: string; label: string; type: "select"; options: readonly (string | SelectOption)[]; dynamicOptions?: (values: Record<string, string | boolean>) => readonly (string | SelectOption)[]; required?: boolean; default?: string; placeholder?: string } & Common)
   | ({ key: string; label: string; type: "switch"; default?: string; required?: boolean; placeholder?: string } & Common)
   | ({ key: string; label: string; type: "textarea"; required?: boolean; placeholder?: string; default?: string } & Common);
 
@@ -133,7 +135,7 @@ export function FormDialog({
                     <SelectValue placeholder={f.placeholder ?? "Select..."} />
                   </SelectTrigger>
                   <SelectContent>
-                    {normalizeOptions(f.options).map((o) => (
+                    {normalizeOptions(f.dynamicOptions ? f.dynamicOptions(values) : f.options).map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         <span className="flex w-full items-center justify-between gap-3">
                           <span>{o.label}</span>
@@ -161,6 +163,11 @@ export function FormDialog({
                   required={f.required}
                 />
               )}
+              {f.type !== "switch" && (f.dynamicHint ? f.dynamicHint(values) : f.hint) ? (
+                <p className="text-xs text-muted-foreground">
+                  {f.dynamicHint ? f.dynamicHint(values) : f.hint}
+                </p>
+              ) : null}
             </Field>
           ))}
           <DialogFooter className="mt-2">
