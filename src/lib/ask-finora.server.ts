@@ -458,10 +458,25 @@ export type Intent =
   | "debt_free"
   | "financial_health"
   | "net_worth_change"
+  | "market_performance"
+  | "earned_today"
   | "general";
 
 export function detectIntent(question: string): Intent {
   const q = question.toLowerCase();
+  // Release 7D — factual market questions come first: they must never be
+  // rerouted into a What-If projection.
+  if (/(net worth).*(change|drop|fall|grow|increase|decrease)|why.*(net worth)/.test(q)) return "net_worth_change";
+  if (/(earn|make|made|gain|profit|income).*(today)|today.*(earn|make|made|gain|profit)/.test(q)) {
+    return /(invest|portfolio|mutual|fund|stock|etf|gold|market|nav)/.test(q) ? "market_performance" : "earned_today";
+  }
+  if (
+    /(mutual fund|mutual funds|portfolio|holding|nav|market value|unrealised|unrealized)/.test(q) ||
+    (/(invest|investment|investments|stock|stocks|etf|gold|crypto)/.test(q) &&
+      /(gain|gained|lose|lost|loss|return|returns|worth|value|perform|performed|performance|up|down|profit|changed|change)/.test(q))
+  ) {
+    return "market_performance";
+  }
   if (/(prepay|pre-pay|pay off|payoff|foreclos|repay)/.test(q) && /(invest|sip|mutual|market)/.test(q)) {
     return "invest_vs_prepay";
   }
@@ -471,7 +486,6 @@ export function detectIntent(question: string): Intent {
   if (/(reach|hit|target|corpus|crore|lakh|how fast|when can i|when will i|how much should i invest)/.test(q)) {
     return "target_reach";
   }
-  if (/(net worth).*(change|drop|fall|grow|increase|decrease)|why.*(net worth)/.test(q)) return "net_worth_change";
   if (/(how am i|doing financially|health|weakest|improve|better|fix|optimi[sz]e|what should i)/.test(q)) {
     return "financial_health";
   }
