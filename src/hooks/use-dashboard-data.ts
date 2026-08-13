@@ -167,19 +167,6 @@ export function useInvestmentsWidget() {
   };
 }
 
-function useGoalsWidgetLegacy() {
-  const query = useQuery(goalsQueryOptions);
-  const goals = useMemo(() => (query.data ?? []).map(toGoal), [query.data]);
-  return {
-    goals,
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
-    hasData: query.data !== undefined,
-    refetch: () => void query.refetch(),
-  };
-}
-
 export function useBillsWidget() {
   const query = useQuery(billsQueryOptions);
   const outlook = useMemo(() => {
