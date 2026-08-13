@@ -787,33 +787,53 @@ function HealthCard() {
               </Badge>
             </div>
             <Progress value={health.score} className="mt-3 h-1.5" />
-            <ul className="mt-4 space-y-3">
-              {health.pillars.map((p) => (
-                <li key={p.key}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{p.label}</span>
-                    <span className="tabular-nums text-muted-foreground">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {health.pillars.slice(0, 3).map((p) => (
+                <div key={p.key} className="min-w-0 rounded-xl bg-muted/40 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="truncate font-medium">{p.label}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
                       {p.points}/{p.max}
                     </span>
                   </div>
-                  <Progress value={p.pct} className="mt-1 h-1.5" />
                   <div className="mt-1 text-xs text-muted-foreground">{p.detail}</div>
-                </li>
+                </div>
               ))}
-              <li>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">Investment mix</span>
-                  <span className="tabular-nums text-muted-foreground">{health.investedShare}%</span>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Share of what you own that is invested (not scored)
-                </div>
-              </li>
-            </ul>
-            <p className="mt-4 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              Strongest: <span className="font-medium text-foreground">{health.strongest.label}</span> · Needs
-              attention: <span className="font-medium text-foreground">{health.weakest.label}</span>
-            </p>
+            </div>
+            <Collapsible className="mt-3">
+              <CollapsibleTrigger className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline">
+                View details
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul className="mt-3 space-y-3">
+                  {health.pillars.map((p) => (
+                    <li key={p.key}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{p.label}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {p.points}/{p.max}
+                        </span>
+                      </div>
+                      <Progress value={p.pct} className="mt-1 h-1.5" />
+                      <div className="mt-1 text-xs text-muted-foreground">{p.detail}</div>
+                    </li>
+                  ))}
+                  <li>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Investment mix</span>
+                      <span className="tabular-nums text-muted-foreground">{health.investedShare}%</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Share of what you own that is invested (not scored)
+                    </div>
+                  </li>
+                </ul>
+                <p className="mt-4 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  Strongest: <span className="font-medium text-foreground">{health.strongest.label}</span> · Needs
+                  attention: <span className="font-medium text-foreground">{health.weakest.label}</span>
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
           </>
         )}
       </CardContent>
