@@ -1,5 +1,6 @@
 // Presentation only — grouping and formatting of holdings already computed by
 // services/portfolio. No valuation maths lives here.
+import { Fragment } from "react";
 import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -185,8 +186,8 @@ export function HoldingsSection({
                 </TableHeader>
                 <TableBody>
                   {groups.map((g) => (
-                    <>
-                      <TableRow key={`g-${g.key}`} className="bg-muted/40 hover:bg-muted/40">
+                    <Fragment key={g.key}>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
                         <TableCell colSpan={3} className="py-2">
                           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
                             <span
@@ -215,7 +216,7 @@ export function HoldingsSection({
                           <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                             {h.units ? h.units : "\u2014"}
                             {h.avgCost ? (
-                              <div className="text-xs">avg \u20b9{h.avgCost.toFixed(2)}</div>
+                              <div className="text-xs">{`avg ₹${h.avgCost.toFixed(2)}`}</div>
                             ) : null}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground">
@@ -242,7 +243,7 @@ export function HoldingsSection({
                           </TableCell>
                         </TableRow>
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
@@ -300,7 +301,7 @@ export function HoldingsSection({
                         <span className="tabular-nums">Invested {formatINR(h.invested)}</span>
                         {h.units ? <span className="tabular-nums">{h.units} units</span> : null}
                         {h.avgCost ? (
-                          <span className="tabular-nums">avg \u20b9{h.avgCost.toFixed(2)}</span>
+                          <span className="tabular-nums">{`avg ₹${h.avgCost.toFixed(2)}`}</span>
                         ) : null}
                         <Badge variant="outline" className="text-[10px]">
                           {h.className}
