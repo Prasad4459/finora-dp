@@ -25,6 +25,7 @@ import {
   ChevronRight,
   CalendarDays,
 } from "lucide-react";
+import { MessageSquare, Compass, Info } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -48,6 +49,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,6 +129,7 @@ export function Dashboard() {
         <>
           <NetWorthHero />
           <NeedsAttention />
+          <DiscoveryCards />
           <CashFlowCard />
           <div className="grid gap-4 lg:grid-cols-3">
             <SpendingCard />
@@ -316,7 +319,10 @@ function NeedsAttention() {
   const bills = useBillsWidget();
   const goalsWidget = useGoalsWidget();
   const { month, previousMonth } = useMonthComparison();
-  const nextBill = bills.outlook.next;
+  // Only genuinely near-term bills belong in the brief: a bill scheduled months
+  // out is not "attention". This keeps the brief consistent with the
+  // "Upcoming bills" widget, which uses the same 14-day window.
+  const nextBill = bills.outlook.upcoming[0] ?? null;
 
   const insights = useMemo(
     () =>
@@ -376,6 +382,47 @@ function InsightRow({ insight }: { insight: Insight }) {
 }
 
 /* ---------------------------- getting started ---------------------------- */
+
+/* ------------------------------- discovery -------------------------------- */
+
+/** Compact, secondary entry points to the two flagship tools. */
+function DiscoveryCards() {
+  const items = [
+    {
+      to: "/ask-finora",
+      icon: MessageSquare,
+      title: "Ask Finora",
+      description: "Ask questions about your money and get answers from your own data.",
+    },
+    {
+      to: "/what-if",
+      icon: Compass,
+      title: "What If?",
+      description: "Test a decision — a new EMI, more investing or a prepayment.",
+    },
+  ] as const;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {items.map((i) => (
+        <Link
+          key={i.to}
+          to={i.to}
+          className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
+        >
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
+            <i.icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">{i.title}</div>
+            <p className="truncate text-xs text-muted-foreground">{i.description}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 function GettingStarted() {
   const { openDialog } = useFinance();
@@ -569,7 +616,13 @@ function NetWorthCard() {
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle className="text-base font-semibold">Net worth</CardTitle>
-          <p className="text-sm text-muted-foreground">Trailing {TREND_MONTHS} months</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-muted-foreground">Trailing {TREND_MONTHS} months</p>
+            <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px] font-normal text-muted-foreground">
+              <Info className="h-3 w-3" />
+              Reconstructed history
+            </Badge>
+          </div>
         </div>
         {!failed && !busy && (
           <div className="text-right">
@@ -595,6 +648,7 @@ function NetWorthCard() {
         ) : !hasHistory ? (
           <WidgetEmpty message="Add an account or a transaction to start tracking net worth." />
         ) : (
+          <>
           <div className="h-[250px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
@@ -608,10 +662,29 @@ function NetWorthCard() {
                 <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatINRCompact} />
                 <Tooltip content={<ChartTooltip valueFormatter={currencyExact} />} />
-                <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} fill="url(#nw)" />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--chart-1)"
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  fill="url(#nw)"
+                  dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                    props.index === data.length - 1 ? (
+                      <circle key="today" cx={props.cx} cy={props.cy} r={4} fill="var(--chart-1)" />
+                    ) : (
+                      <g key={props.index} />
+                    )
+                  }
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Only today's net worth ({currency(netWorth)}, solid point) is measured. Earlier months are
+            reconstructed by removing each month's recorded ledger activity — not historical snapshots.
+          </p>
+          </>
         )}
       </CardContent>
     </Card>
@@ -714,33 +787,53 @@ function HealthCard() {
               </Badge>
             </div>
             <Progress value={health.score} className="mt-3 h-1.5" />
-            <ul className="mt-4 space-y-3">
-              {health.pillars.map((p) => (
-                <li key={p.key}>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{p.label}</span>
-                    <span className="tabular-nums text-muted-foreground">
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              {health.pillars.slice(0, 3).map((p) => (
+                <div key={p.key} className="min-w-0 rounded-xl bg-muted/40 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="truncate font-medium">{p.label}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
                       {p.points}/{p.max}
                     </span>
                   </div>
-                  <Progress value={p.pct} className="mt-1 h-1.5" />
                   <div className="mt-1 text-xs text-muted-foreground">{p.detail}</div>
-                </li>
+                </div>
               ))}
-              <li>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">Investment mix</span>
-                  <span className="tabular-nums text-muted-foreground">{health.investedShare}%</span>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Share of what you own that is invested (not scored)
-                </div>
-              </li>
-            </ul>
-            <p className="mt-4 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-              Strongest: <span className="font-medium text-foreground">{health.strongest.label}</span> · Needs
-              attention: <span className="font-medium text-foreground">{health.weakest.label}</span>
-            </p>
+            </div>
+            <Collapsible className="mt-3">
+              <CollapsibleTrigger className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline">
+                View details
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul className="mt-3 space-y-3">
+                  {health.pillars.map((p) => (
+                    <li key={p.key}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{p.label}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {p.points}/{p.max}
+                        </span>
+                      </div>
+                      <Progress value={p.pct} className="mt-1 h-1.5" />
+                      <div className="mt-1 text-xs text-muted-foreground">{p.detail}</div>
+                    </li>
+                  ))}
+                  <li>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Investment mix</span>
+                      <span className="tabular-nums text-muted-foreground">{health.investedShare}%</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Share of what you own that is invested (not scored)
+                    </div>
+                  </li>
+                </ul>
+                <p className="mt-4 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                  Strongest: <span className="font-medium text-foreground">{health.strongest.label}</span> · Needs
+                  attention: <span className="font-medium text-foreground">{health.weakest.label}</span>
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
           </>
         )}
       </CardContent>
