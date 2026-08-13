@@ -316,7 +316,10 @@ function NeedsAttention() {
   const bills = useBillsWidget();
   const goalsWidget = useGoalsWidget();
   const { month, previousMonth } = useMonthComparison();
-  const nextBill = bills.outlook.next;
+  // Only genuinely near-term bills belong in the brief: a bill scheduled months
+  // out is not "attention". This keeps the brief consistent with the
+  // "Upcoming bills" widget, which uses the same 14-day window.
+  const nextBill = bills.outlook.upcoming[0] ?? null;
 
   const insights = useMemo(
     () =>
