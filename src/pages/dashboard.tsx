@@ -122,29 +122,26 @@ export function Dashboard() {
   const onboarding = useOnboardingState();
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <DailyBrief />
+    <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-hidden">
+      <DashboardHeader />
       {onboarding.isNewUser ? (
         <GettingStarted />
       ) : (
         <>
-          <FinancialOverview />
+          <NetWorthHero />
+          <NeedsAttention />
           <CashFlowCard />
           <div className="grid gap-4 lg:grid-cols-3">
             <SpendingCard />
             <NetWorthCard />
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <GoalsCard />
-            <HealthCard />
-          </div>
           <div className="grid gap-4 lg:grid-cols-3">
             <RecentTransactionsCard />
-            <UpcomingBillsCard />
+            <GoalsCard />
           </div>
+          <HealthCard />
         </>
       )}
-      <QuickActions />
     </div>
   );
 }
