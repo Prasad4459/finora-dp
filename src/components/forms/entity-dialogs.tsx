@@ -183,8 +183,21 @@ export function EntityDialogs({
     instrumentMeta(String(v.type ?? "")).fields.includes(field);
 
   const ASSET_FIELD_DEFS: Record<InstrumentField, FieldDef> = {
-    institution: { key: "institution", label: "Institution / AMC", type: "text", placeholder: "e.g. HDFC AMC, SBI", showWhen: shows("institution") },
-    folio: { key: "folio", label: "Folio / Account number", type: "text", showWhen: shows("folio") },
+    institution: {
+      key: "institution",
+      label: "AMC / bank / broker",
+      type: "text",
+      placeholder: "e.g. HDFC AMC, SBI, Zerodha",
+      hint: "Who holds this investment. Shown under the holding name.",
+      showWhen: shows("institution"),
+    },
+    folio: {
+      key: "folio",
+      label: "Folio / account number",
+      type: "text",
+      placeholder: "Optional — for your reference",
+      showWhen: shows("folio"),
+    },
     symbol: {
       key: "symbol",
       label: "Scheme code / ticker",
@@ -235,7 +248,14 @@ export function EntityDialogs({
               : "Only AMFI / NSE / BSE holdings are refreshed automatically.",
       showWhen: shows("priceSource"),
     },
-    purchase: { key: "purchase", label: "Invested amount (₹)", type: "number", required: true, showWhen: shows("purchase") },
+    purchase: {
+      key: "purchase",
+      label: "Total invested amount (₹)",
+      type: "number",
+      required: true,
+      hint: "What you put in overall — cost, not today's value. Unrealised gain = current value − this.",
+      showWhen: shows("purchase"),
+    },
     units: {
       key: "units",
       // Physical/digital metal is held in grams; funds and ETFs in units.
@@ -243,9 +263,17 @@ export function EntityDialogs({
       dynamicLabel: (v) =>
         instrumentPriceUnit(String(v.type ?? "")) === "per_gram" ? "Grams held" : "Units held",
       type: "number",
+      placeholder: "e.g. 152.348",
+      hint: "Total quantity you currently hold.",
       showWhen: shows("units"),
     },
-    avgCost: { key: "avgCost", label: "Average cost per unit (₹)", type: "number", showWhen: shows("avgCost") },
+    avgCost: {
+      key: "avgCost",
+      label: "Average cost per unit (₹)",
+      type: "number",
+      placeholder: "Leave empty to derive from invested ÷ units",
+      showWhen: shows("avgCost"),
+    },
     lastPrice: {
       key: "lastPrice",
       label: "Current NAV / price PER UNIT (₹)",
