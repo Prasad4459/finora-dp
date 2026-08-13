@@ -72,6 +72,7 @@ import {
   useBalanceSheet,
   useBillsWidget,
   useGoalsWidget,
+  useInvestmentsWidget,
   useMonthComparison,
   useOnboardingState,
   useRecentActivity,
