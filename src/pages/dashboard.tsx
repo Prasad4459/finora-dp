@@ -146,110 +146,219 @@ export function Dashboard() {
   );
 }
 
-/* ------------------------------ daily brief ------------------------------ */
+/* --------------------------------- header -------------------------------- */
 
-function DailyBrief() {
+function DashboardHeader() {
   const greeting = useFinanceGreeting();
   const name = useDisplayName();
+  return (
+    <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:flex sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{longDateIN.format(new Date())}</span>
+        </p>
+        <h1 className="mt-1 break-words font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+          {greeting}
+          {name ? `, ${name}` : ""}
+        </h1>
+      </div>
+      <QuickActions />
+    </header>
+  );
+}
+
+/* ------------------------------ net-worth hero ---------------------------- */
+
+function NetWorthHero() {
+  const sheet = useBalanceSheet();
+  const { month } = useMonthComparison();
+  const investments = useInvestmentsWidget();
+  const { openDialog } = useFinance();
+
+  const t = sheet.totals;
+  const nwChange = netWorthChange(month);
+  const p = investments.portfolio;
+  const hasHoldings = p.holdings.length > 0;
+
+  return (
+    <Card className="border-border/70">
+      <CardContent className="p-5 sm:p-6">
+        {sheet.isError ? (
+          <WidgetError message="Couldn't load your balance sheet." onRetry={sheet.refetch} />
+        ) : sheet.isLoading ? (
+          <WidgetSkeleton lines={5} />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Net worth
+              </div>
+              <div className="mt-1 break-words font-display text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+                {currency(t.netWorth)}
+              </div>
+              <div
+                className={cn(
+                  "mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                  nwChange >= 0 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {nwChange >= 0 ? (
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                )}
+                {nwChange >= 0 ? "+" : "\u2212"}
+                {currency(Math.abs(nwChange))} this month
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-border/70 pt-5 sm:grid-cols-3">
+                <HeroMetric
+                  label="Available balance"
+                  value={currency(t.totalBalance)}
+                  hint={`${sheet.accountCount} account${sheet.accountCount === 1 ? "" : "s"}`}
+                />
+                <HeroMetric
+                  label="Portfolio value"
+                  value={investments.isError ? "\u2014" : currency(p.value)}
+                  hint={
+                    investments.isError
+                      ? "Couldn't load"
+                      : `${p.holdings.length} holding${p.holdings.length === 1 ? "" : "s"}`
+                  }
+                />
+                <HeroMetric
+                  label="Monthly surplus"
+                  value={currency(t.monthSavings)}
+                  hint={`${t.savingsRate}% savings rate`}
+                  tone={t.monthSavings >= 0 ? "positive" : "negative"}
+                />
+              </div>
+            </div>
+
+            <div className="min-w-0 rounded-xl border border-border/70 bg-muted/30 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium">Investments</div>
+                <TrendingUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </div>
+              {investments.isError ? (
+                <WidgetError message="Couldn't load your portfolio." onRetry={investments.refetch} />
+              ) : investments.isLoading ? (
+                <WidgetSkeleton lines={3} className="mt-3" />
+              ) : !hasHoldings ? (
+                <WidgetEmpty
+                  message="Track your investments to see portfolio value and gains."
+                  actionLabel="Add investment"
+                  onAction={() => openDialog("investment")}
+                  className="py-3"
+                />
+              ) : (
+                <>
+                  <div className="mt-3 truncate font-display text-2xl font-semibold tabular-nums">
+                    {currency(p.value)}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-4">
+                    <HeroMetric label="Invested" value={currency(p.invested)} />
+                    <HeroMetric
+                      label="Unrealised"
+                      value={`${p.gain >= 0 ? "+" : "\u2212"}${currency(Math.abs(p.gain))}`}
+                      hint={`${p.gain >= 0 ? "+" : "\u2212"}${Math.abs(p.gainPct).toFixed(1)}%`}
+                      tone={p.gain >= 0 ? "positive" : "negative"}
+                    />
+                  </div>
+                  <Button variant="ghost" size="sm" className="mt-3 w-full" asChild>
+                    <Link to="/investments">
+                      View portfolio
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HeroMetric({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "neutral" | "positive" | "negative";
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 truncate font-display text-lg font-semibold tabular-nums sm:text-xl",
+          tone === "positive" && "text-primary",
+          tone === "negative" && "text-destructive",
+        )}
+      >
+        {value}
+      </div>
+      {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
+    </div>
+  );
+}
+
+/* ----------------------------- needs attention ---------------------------- */
+
+function NeedsAttention() {
   const sheet = useBalanceSheet();
   const bills = useBillsWidget();
   const goalsWidget = useGoalsWidget();
   const { month, previousMonth } = useMonthComparison();
-  const { openDialog } = useFinance();
-
-  const t = sheet.totals;
-  const health = useMemo(() => computeHealthScore(t), [t]);
   const nextBill = bills.outlook.next;
 
   const insights = useMemo(
     () =>
       buildInsights({
-        totals: t,
+        totals: sheet.totals,
         month,
         previousMonth,
         nextBill: nextBill ? { ...nextBill, name: nextBill.name } : null,
         goals: goalsWidget.goals,
         hasData: sheet.hasData,
       }),
-    [t, month, previousMonth, nextBill, goalsWidget.goals, sheet.hasData],
+    [sheet.totals, month, previousMonth, nextBill, goalsWidget.goals, sheet.hasData],
   );
 
-  const failed = sheet.isError;
-  const busy = sheet.isLoading;
-
-  const topGoal = goalsWidget.goals
-    .filter((g) => g.target > 0)
-    .sort((a, b) => b.current / b.target - a.current / a.target)[0];
-
   return (
-    <Card className="border-border/70">
-      <CardContent className="p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {longDateIN.format(new Date())}
-            </p>
-            <h1 className="mt-1.5 truncate font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-              {greeting}
-              {name ? `, ${name}` : ""}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your daily financial brief. <span className="font-medium text-primary">Organized.</span>
-            </p>
-          </div>
-          <Button size="sm" className="shrink-0 self-start" onClick={() => openDialog("expense")}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add transaction
-          </Button>
-        </div>
-
-        {failed ? (
-          <div className="mt-4">
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="border-border/70 lg:col-span-2">
+        <CardHeader className="space-y-0">
+          <CardTitle className="text-base font-semibold">Needs attention</CardTitle>
+          <p className="text-sm text-muted-foreground">Today's brief, based on your activity</p>
+        </CardHeader>
+        <CardContent>
+          {sheet.isError ? (
             <WidgetError message="Couldn't load today's brief." onRetry={sheet.refetch} />
-          </div>
-        ) : busy ? (
-          <WidgetSkeleton lines={4} className="mt-5" />
-        ) : (
-          <>
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/70 pt-5 sm:grid-cols-3 lg:grid-cols-4">
-              <BriefMetric label="Available balance" value={currency(t.totalBalance)} />
-              <BriefMetric label="Net worth" value={currency(t.netWorth)} />
-              <BriefMetric label="Income this month" value={currency(t.monthIncome)} />
-              <BriefMetric label="Expenses this month" value={currency(t.monthExpenses)} />
-              <BriefMetric
-                label="Savings this month"
-                value={currency(t.monthSavings)}
-                hint={`${t.savingsRate}% savings rate`}
-              />
-              <BriefMetric
-                label="Upcoming bills"
-                value={bills.isError ? "—" : currency(bills.total)}
-                hint={bills.isError ? "Couldn't load" : `${bills.count} due soon`}
-              />
-              <BriefMetric
-                label="Goal progress"
-                value={topGoal ? `${percentOf(topGoal.current, topGoal.target)}%` : "—"}
-                hint={topGoal ? topGoal.name : "No goals yet"}
-              />
-              <BriefMetric
-                label="Financial health"
-                value={health.insufficientData ? "—" : `${health.score}/100`}
-                hint={health.insufficientData ? "Getting started" : health.label}
-              />
-            </div>
-
-            {insights.length > 0 && (
-              <ul className="mt-5 grid gap-2 sm:grid-cols-2">
-                {insights.map((i) => (
-                  <InsightRow key={i.id} insight={i} />
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+          ) : sheet.isLoading ? (
+            <WidgetSkeleton lines={3} />
+          ) : insights.length === 0 ? (
+            <WidgetEmpty message="Nothing needs your attention right now." className="py-2" />
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {insights.map((i) => (
+                <InsightRow key={i.id} insight={i} />
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+      <UpcomingBillsCard />
+    </div>
   );
 }
 
