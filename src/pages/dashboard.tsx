@@ -383,6 +383,47 @@ function InsightRow({ insight }: { insight: Insight }) {
 
 /* ---------------------------- getting started ---------------------------- */
 
+/* ------------------------------- discovery -------------------------------- */
+
+/** Compact, secondary entry points to the two flagship tools. */
+function DiscoveryCards() {
+  const items = [
+    {
+      to: "/ask-finora",
+      icon: MessageSquare,
+      title: "Ask Finora",
+      description: "Ask questions about your money and get answers from your own data.",
+    },
+    {
+      to: "/what-if",
+      icon: Compass,
+      title: "What If?",
+      description: "Test a decision — a new EMI, more investing or a prepayment.",
+    },
+  ] as const;
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {items.map((i) => (
+        <Link
+          key={i.to}
+          to={i.to}
+          className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
+        >
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
+            <i.icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">{i.title}</div>
+            <p className="truncate text-xs text-muted-foreground">{i.description}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function GettingStarted() {
   const { openDialog } = useFinance();
   const steps: Array<{ title: string; description: string; action: () => void; cta: string }> = [
