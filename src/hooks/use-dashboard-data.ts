@@ -20,6 +20,7 @@ import { toTransactionView, type TransactionView } from "@/lib/transaction-view"
 import { classifyBills, type BillInput, type ClassifiedBill } from "@/services/bills";
 import { addMonths, todayISO } from "@/lib/date-in";
 import type { MonthMetrics } from "@/services/finance";
+import { buildPortfolio } from "@/services/portfolio";
 
 /** Uniform status shape every dashboard widget consumes. */
 export type WidgetStatus = {
@@ -138,6 +139,26 @@ export function useGoalsWidget() {
   const goals = useMemo(() => (query.data ?? []).map(toGoal), [query.data]);
   return {
     goals,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    hasData: query.data !== undefined,
+    refetch: () => void query.refetch(),
+  };
+}
+
+/**
+ * Portfolio view for the dashboard hero. Reuses the same assets query and the
+ * same portfolio maths as /investments — no new financial logic here.
+ */
+export function useInvestmentsWidget() {
+  const query = useQuery(assetsQueryOptions);
+  const portfolio = useMemo(
+    () => buildPortfolio((query.data ?? []).map(toAsset), todayISO()),
+    [query.data],
+  );
+  return {
+    portfolio,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,

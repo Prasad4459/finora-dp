@@ -9,7 +9,6 @@
 import {
   Wallet,
   ArrowDownCircle,
-  ArrowUpCircle,
   TrendingUp,
   Plus,
   Landmark,
@@ -18,7 +17,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Target,
-  PiggyBank,
   Sparkles,
   Receipt,
   ArrowLeftRight,
@@ -45,7 +43,6 @@ import {
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useFinanceGreeting } from "@/components/finance/use-greeting";
-import { StatCard } from "@/components/finance/stat-card";
 import { WidgetEmpty, WidgetError, WidgetSkeleton } from "@/components/finance/widget-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +65,6 @@ import {
   buildBreakdown,
   buildCashFlowSeries,
   buildNetWorthSeries,
-  changePct,
 } from "@/services/dashboard";
 import { IST_TIMEZONE } from "@/lib/date-in";
 import { TRANSACTION_LABEL } from "@/lib/transaction-view";
@@ -76,6 +72,7 @@ import {
   useBalanceSheet,
   useBillsWidget,
   useGoalsWidget,
+  useInvestmentsWidget,
   useMonthComparison,
   useOnboardingState,
   useRecentActivity,
@@ -122,146 +119,242 @@ export function Dashboard() {
   const onboarding = useOnboardingState();
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <DailyBrief />
+    <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-hidden">
+      <DashboardHeader />
       {onboarding.isNewUser ? (
         <GettingStarted />
       ) : (
         <>
-          <FinancialOverview />
+          <NetWorthHero />
+          <NeedsAttention />
           <CashFlowCard />
           <div className="grid gap-4 lg:grid-cols-3">
             <SpendingCard />
             <NetWorthCard />
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <GoalsCard />
-            <HealthCard />
-          </div>
           <div className="grid gap-4 lg:grid-cols-3">
             <RecentTransactionsCard />
-            <UpcomingBillsCard />
+            <GoalsCard />
           </div>
+          <HealthCard />
         </>
       )}
-      <QuickActions />
     </div>
   );
 }
 
-/* ------------------------------ daily brief ------------------------------ */
+/* --------------------------------- header -------------------------------- */
 
-function DailyBrief() {
+function DashboardHeader() {
   const greeting = useFinanceGreeting();
   const name = useDisplayName();
+  return (
+    <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 sm:flex sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{longDateIN.format(new Date())}</span>
+        </p>
+        <h1 className="mt-1 break-words font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+          {greeting}
+          {name ? `, ${name}` : ""}
+        </h1>
+      </div>
+      <QuickActions />
+    </header>
+  );
+}
+
+/* ------------------------------ net-worth hero ---------------------------- */
+
+function NetWorthHero() {
   const sheet = useBalanceSheet();
-  const bills = useBillsWidget();
-  const goalsWidget = useGoalsWidget();
-  const { month, previousMonth } = useMonthComparison();
+  const { month } = useMonthComparison();
+  const investments = useInvestmentsWidget();
   const { openDialog } = useFinance();
 
   const t = sheet.totals;
-  const health = useMemo(() => computeHealthScore(t), [t]);
-  const nextBill = bills.outlook.next;
-
-  const insights = useMemo(
-    () =>
-      buildInsights({
-        totals: t,
-        month,
-        previousMonth,
-        nextBill: nextBill ? { ...nextBill, name: nextBill.name } : null,
-        goals: goalsWidget.goals,
-        hasData: sheet.hasData,
-      }),
-    [t, month, previousMonth, nextBill, goalsWidget.goals, sheet.hasData],
-  );
-
-  const failed = sheet.isError;
-  const busy = sheet.isLoading;
-
-  const topGoal = goalsWidget.goals
-    .filter((g) => g.target > 0)
-    .sort((a, b) => b.current / b.target - a.current / a.target)[0];
+  const nwChange = netWorthChange(month);
+  const p = investments.portfolio;
+  const hasHoldings = p.holdings.length > 0;
 
   return (
     <Card className="border-border/70">
       <CardContent className="p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <CalendarDays className="h-3.5 w-3.5" />
-              {longDateIN.format(new Date())}
-            </p>
-            <h1 className="mt-1.5 truncate font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-              {greeting}
-              {name ? `, ${name}` : ""}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your daily financial brief. <span className="font-medium text-primary">Organized.</span>
-            </p>
-          </div>
-          <Button size="sm" className="shrink-0 self-start" onClick={() => openDialog("expense")}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add transaction
-          </Button>
-        </div>
-
-        {failed ? (
-          <div className="mt-4">
-            <WidgetError message="Couldn't load today's brief." onRetry={sheet.refetch} />
-          </div>
-        ) : busy ? (
-          <WidgetSkeleton lines={4} className="mt-5" />
+        {sheet.isError ? (
+          <WidgetError message="Couldn't load your balance sheet." onRetry={sheet.refetch} />
+        ) : sheet.isLoading ? (
+          <WidgetSkeleton lines={5} />
         ) : (
-          <>
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/70 pt-5 sm:grid-cols-3 lg:grid-cols-4">
-              <BriefMetric label="Available balance" value={currency(t.totalBalance)} />
-              <BriefMetric label="Net worth" value={currency(t.netWorth)} />
-              <BriefMetric label="Income this month" value={currency(t.monthIncome)} />
-              <BriefMetric label="Expenses this month" value={currency(t.monthExpenses)} />
-              <BriefMetric
-                label="Savings this month"
-                value={currency(t.monthSavings)}
-                hint={`${t.savingsRate}% savings rate`}
-              />
-              <BriefMetric
-                label="Upcoming bills"
-                value={bills.isError ? "—" : currency(bills.total)}
-                hint={bills.isError ? "Couldn't load" : `${bills.count} due soon`}
-              />
-              <BriefMetric
-                label="Goal progress"
-                value={topGoal ? `${percentOf(topGoal.current, topGoal.target)}%` : "—"}
-                hint={topGoal ? topGoal.name : "No goals yet"}
-              />
-              <BriefMetric
-                label="Financial health"
-                value={health.insufficientData ? "—" : `${health.score}/100`}
-                hint={health.insufficientData ? "Getting started" : health.label}
-              />
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Net worth
+              </div>
+              <div className="mt-1 break-words font-display text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+                {currency(t.netWorth)}
+              </div>
+              <div
+                className={cn(
+                  "mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                  nwChange >= 0 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {nwChange >= 0 ? (
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                )}
+                {nwChange >= 0 ? "+" : "\u2212"}
+                {currency(Math.abs(nwChange))} this month
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-border/70 pt-5 sm:grid-cols-3">
+                <HeroMetric
+                  label="Available balance"
+                  value={currency(t.totalBalance)}
+                  hint={`${sheet.accountCount} account${sheet.accountCount === 1 ? "" : "s"}`}
+                />
+                <HeroMetric
+                  label="Portfolio value"
+                  value={investments.isError ? "\u2014" : currency(p.value)}
+                  hint={
+                    investments.isError
+                      ? "Couldn't load"
+                      : `${p.holdings.length} holding${p.holdings.length === 1 ? "" : "s"}`
+                  }
+                />
+                <HeroMetric
+                  label="Monthly surplus"
+                  value={currency(t.monthSavings)}
+                  hint={`${t.savingsRate}% savings rate`}
+                  tone={t.monthSavings >= 0 ? "positive" : "negative"}
+                />
+              </div>
             </div>
 
-            {insights.length > 0 && (
-              <ul className="mt-5 grid gap-2 sm:grid-cols-2">
-                {insights.map((i) => (
-                  <InsightRow key={i.id} insight={i} />
-                ))}
-              </ul>
-            )}
-          </>
+            <div className="min-w-0 rounded-xl border border-border/70 bg-muted/30 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium">Investments</div>
+                <TrendingUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </div>
+              {investments.isError ? (
+                <WidgetError message="Couldn't load your portfolio." onRetry={investments.refetch} />
+              ) : investments.isLoading ? (
+                <WidgetSkeleton lines={3} className="mt-3" />
+              ) : !hasHoldings ? (
+                <WidgetEmpty
+                  message="Track your investments to see portfolio value and gains."
+                  actionLabel="Add investment"
+                  onAction={() => openDialog("investment")}
+                  className="py-3"
+                />
+              ) : (
+                <>
+                  <div className="mt-3 truncate font-display text-2xl font-semibold tabular-nums">
+                    {currency(p.value)}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-4">
+                    <HeroMetric label="Invested" value={currency(p.invested)} />
+                    <HeroMetric
+                      label="Unrealised"
+                      value={`${p.gain >= 0 ? "+" : "\u2212"}${currency(Math.abs(p.gain))}`}
+                      hint={`${p.gain >= 0 ? "+" : "\u2212"}${Math.abs(p.gainPct).toFixed(1)}%`}
+                      tone={p.gain >= 0 ? "positive" : "negative"}
+                    />
+                  </div>
+                  <Button variant="ghost" size="sm" className="mt-3 w-full" asChild>
+                    <Link to="/investments">
+                      View portfolio
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function BriefMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function HeroMetric({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "neutral" | "positive" | "negative";
+}) {
   return (
     <div className="min-w-0">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-1 truncate font-display text-lg font-semibold tabular-nums">{value}</div>
+      <div className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 truncate font-display text-lg font-semibold tabular-nums sm:text-xl",
+          tone === "positive" && "text-primary",
+          tone === "negative" && "text-destructive",
+        )}
+      >
+        {value}
+      </div>
       {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
+    </div>
+  );
+}
+
+/* ----------------------------- needs attention ---------------------------- */
+
+function NeedsAttention() {
+  const sheet = useBalanceSheet();
+  const bills = useBillsWidget();
+  const goalsWidget = useGoalsWidget();
+  const { month, previousMonth } = useMonthComparison();
+  const nextBill = bills.outlook.next;
+
+  const insights = useMemo(
+    () =>
+      buildInsights({
+        totals: sheet.totals,
+        month,
+        previousMonth,
+        nextBill: nextBill ? { ...nextBill, name: nextBill.name } : null,
+        goals: goalsWidget.goals,
+        hasData: sheet.hasData,
+      }),
+    [sheet.totals, month, previousMonth, nextBill, goalsWidget.goals, sheet.hasData],
+  );
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="border-border/70 lg:col-span-2">
+        <CardHeader className="space-y-0">
+          <CardTitle className="text-base font-semibold">Needs attention</CardTitle>
+          <p className="text-sm text-muted-foreground">Today's brief, based on your activity</p>
+        </CardHeader>
+        <CardContent>
+          {sheet.isError ? (
+            <WidgetError message="Couldn't load today's brief." onRetry={sheet.refetch} />
+          ) : sheet.isLoading ? (
+            <WidgetSkeleton lines={3} />
+          ) : insights.length === 0 ? (
+            <WidgetEmpty message="Nothing needs your attention right now." className="py-2" />
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {insights.map((i) => (
+                <InsightRow key={i.id} insight={i} />
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+      <UpcomingBillsCard />
     </div>
   );
 }
@@ -320,72 +413,15 @@ function GettingStarted() {
   );
 }
 
-/* --------------------------- financial overview --------------------------- */
-
-function FinancialOverview() {
-  const sheet = useBalanceSheet();
-  const bills = useBillsWidget();
-  const { month } = useMonthComparison();
-  const t = sheet.totals;
-  const state = cardState(sheet);
-  const nwChange = netWorthChange(month);
-
-  const billsDelta = bills.outlook.overdueCount
-    ? `${bills.outlook.overdueCount} overdue`
-    : `${bills.count} bill${bills.count === 1 ? "" : "s"} due soon`;
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        label="Net worth"
-        value={currency(t.netWorth)}
-        delta={`${nwChange >= 0 ? "+" : "−"}${currency(Math.abs(nwChange))} this month`}
-        icon={TrendingUp}
-        tone={nwChange >= 0 ? "positive" : "negative"}
-        state={state}
-        onRetry={sheet.refetch}
-      />
-      <StatCard
-        label="Available balance"
-        value={currency(t.totalBalance)}
-        delta={`Across ${sheet.accountCount} account${sheet.accountCount === 1 ? "" : "s"}`}
-        icon={Wallet}
-        state={state}
-        onRetry={sheet.refetch}
-      />
-      <StatCard
-        label="Monthly savings"
-        value={currency(t.monthSavings)}
-        delta={`${t.savingsRate}% savings rate`}
-        icon={PiggyBank}
-        tone={t.monthSavings >= 0 ? "positive" : "negative"}
-        state={state}
-        onRetry={sheet.refetch}
-      />
-      <StatCard
-        label="Upcoming bills"
-        value={currency(bills.total)}
-        delta={billsDelta}
-        icon={Receipt}
-        tone={bills.outlook.overdueCount ? "negative" : "neutral"}
-        state={cardState(bills)}
-        onRetry={bills.refetch}
-      />
-    </div>
-  );
-}
-
 /* -------------------------------- cash flow ------------------------------- */
 
 function CashFlowCard() {
   const summary = useSummaryWidget();
-  const { month, previousMonth } = useMonthComparison();
   const data = useMemo(
     () => buildCashFlowSeries(summary.series(TREND_MONTHS)),
     [summary.categoryRows, summary.isLoading, summary.current.year, summary.current.month],
   );
   const hasActivity = data.some((d) => d.income > 0 || d.expense > 0);
-  const spendChange = changePct(month.consumptionExpense, previousMonth.consumptionExpense);
 
   return (
     <Card className="border-border/70">
@@ -406,7 +442,7 @@ function CashFlowCard() {
         ) : summary.isLoading ? (
           <WidgetSkeleton lines={6} className="h-[260px]" />
         ) : !hasActivity ? (
-          <WidgetEmpty message="No income or expenses recorded yet." />
+          <WidgetEmpty message="No income or expenses recorded yet — add a transaction to see your cash flow." />
         ) : (
           <>
             <div className="h-[260px] w-full min-w-0 overflow-hidden">
@@ -421,16 +457,6 @@ function CashFlowCard() {
                   <Line type="monotone" dataKey="savings" stroke="var(--chart-3)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-border/70 pt-4 sm:grid-cols-4">
-              <BriefMetric label="Income this month" value={currency(month.grossIncome)} />
-              <BriefMetric label="Expenses this month" value={currency(month.consumptionExpense)} />
-              <BriefMetric label="Savings this month" value={currency(month.savings)} hint={`${month.savingsRate}% rate`} />
-              <BriefMetric
-                label="vs last month"
-                value={spendChange === null ? "—" : `${spendChange > 0 ? "+" : ""}${spendChange}%`}
-                hint={spendChange === null ? "No spending last month" : "Change in spending"}
-              />
             </div>
           </>
         )}
@@ -461,7 +487,7 @@ function SpendingCard() {
         ) : summary.isLoading ? (
           <WidgetSkeleton lines={5} className="h-[200px]" />
         ) : slices.length === 0 ? (
-          <WidgetEmpty message="No spending recorded this month." />
+          <WidgetEmpty message="No spending recorded this month — your category breakdown appears here." />
         ) : (
           <>
             <div className="relative h-[190px] w-full min-w-0 overflow-hidden">
@@ -613,7 +639,12 @@ function GoalsCard() {
         ) : isLoading ? (
           <WidgetSkeleton lines={4} />
         ) : top.length === 0 ? (
-          <WidgetEmpty message="No goals yet — create one to start tracking progress." className="py-0" />
+          <WidgetEmpty
+            message="Set a goal — an emergency fund or a big purchase — to track progress here."
+            actionLabel="Create goal"
+            onAction={() => openDialog("goal")}
+            className="py-0"
+          />
         ) : (
           top.map((g) => {
             const pct = percentOf(g.current, g.target);
@@ -653,10 +684,10 @@ function HealthCard() {
     <Card className="border-border/70">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div>
-          <CardTitle className="text-base font-semibold">Financial health</CardTitle>
+          <CardTitle className="text-sm font-semibold">Financial health</CardTitle>
           <p className="text-sm text-muted-foreground">Savings, debt & emergency fund</p>
         </div>
-        <Sparkles className="h-4 w-4 text-primary" />
+        <Sparkles className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
         {sheet.isError ? (
@@ -673,14 +704,16 @@ function HealthCard() {
           </div>
         ) : (
           <>
-            <div className="flex items-end gap-2">
-              <div className="font-display text-5xl font-semibold tracking-tight">{health.score}</div>
-              <div className="pb-1 text-sm text-muted-foreground">/ 100</div>
+            <div className="flex items-center gap-2">
+              <div className="font-display text-xl font-semibold tabular-nums tracking-tight">
+                {health.score}
+                <span className="ml-0.5 text-sm font-normal text-muted-foreground">/ 100</span>
+              </div>
               <Badge variant="secondary" className="ml-auto">
                 {health.label}
               </Badge>
             </div>
-            <Progress value={health.score} className="mt-4 h-2" />
+            <Progress value={health.score} className="mt-3 h-1.5" />
             <ul className="mt-4 space-y-3">
               {health.pillars.map((p) => (
                 <li key={p.key}>
@@ -719,6 +752,7 @@ function HealthCard() {
 
 function RecentTransactionsCard() {
   const { transactions, isLoading, isError, refetch } = useRecentActivity();
+  const { openDialog } = useFinance();
   const rows = transactions.slice(0, 8);
   return (
     <Card className="border-border/70 lg:col-span-2">
@@ -743,14 +777,21 @@ function RecentTransactionsCard() {
         ) : (
           <ul className="divide-y divide-border">
             {rows.length === 0 && (
-              <li className="px-5 py-6 text-sm text-muted-foreground">No transactions yet.</li>
+              <li className="px-5 py-4">
+                <WidgetEmpty
+                  message="Start tracking your money to see your financial activity here."
+                  actionLabel="Add transaction"
+                  onAction={() => openDialog("expense")}
+                  className="py-0"
+                />
+              </li>
             )}
             {rows.map((t) => {
               const positive = t.direction === "in";
               const neutral = t.direction === "neutral";
               const Icon = positive ? ArrowDownCircle : neutral ? ArrowLeftRight : ShoppingBag;
               return (
-                <li key={t.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={t.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
                   <div
                     className={cn(
                       "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
@@ -765,20 +806,20 @@ function RecentTransactionsCard() {
                       {TRANSACTION_LABEL[t.type]} • {t.category} • {t.account}
                     </div>
                   </div>
-                  <div className="hidden text-xs text-muted-foreground sm:block">{formatDateIN(t.date)}</div>
+                  <div className="hidden text-xs text-muted-foreground lg:block">{formatDateIN(t.date)}</div>
                   <div
                     className={cn(
-                      "flex items-center gap-1 text-sm font-semibold tabular-nums",
+                      "flex shrink-0 items-center gap-0.5 text-sm font-semibold tabular-nums",
                       positive ? "text-primary" : "text-foreground",
                     )}
                   >
                     {positive ? (
-                      <ArrowDownRight className="h-3.5 w-3.5" />
+                      <ArrowDownRight className="hidden h-3.5 w-3.5 sm:block" />
                     ) : (
-                      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      <ArrowUpRight className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
                     )}
                     {positive ? "+" : neutral ? "" : "-"}
-                    {currencyExact(Math.abs(t.amount))}
+                    {currency(Math.abs(t.amount))}
                   </div>
                 </li>
               );
@@ -824,12 +865,14 @@ function UpcomingBillsCard() {
         ) : (
           <ul className="divide-y divide-border">
             {rows.length === 0 && (
-              <li className="px-5 py-6 text-sm text-muted-foreground">No bills due in the next 14 days.</li>
+              <li className="px-5 py-4 text-sm text-muted-foreground">
+                Nothing due in the next 14 days. Add a bill to get reminders before it's due.
+              </li>
             )}
             {rows.map((b) => {
               const Icon = b.icon ?? Receipt;
               return (
-                <li key={b.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={b.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                     <Icon className="h-4 w-4" />
                   </div>
@@ -842,7 +885,7 @@ function UpcomingBillsCard() {
                       {URGENCY_LABEL[b.urgency]} · {formatDateIN(b.dueISO)}
                     </Badge>
                   </div>
-                  <div className="text-sm font-semibold tabular-nums">{currencyExact(b.amount)}</div>
+                  <div className="shrink-0 text-sm font-semibold tabular-nums">{currency(b.amount)}</div>
                 </li>
               );
             })}
@@ -863,64 +906,43 @@ function UpcomingBillsCard() {
 
 function QuickActions() {
   const { openDialog } = useFinance();
+  const more: Array<{ label: string; icon: typeof Wallet; kind: Parameters<typeof openDialog>[0] }> = [
+    { label: "Add income", icon: ArrowDownCircle, kind: "income" },
+    { label: "Transfer", icon: ArrowLeftRight, kind: "transfer" },
+    { label: "Add investment", icon: TrendingUp, kind: "investment" },
+    { label: "Add account", icon: Wallet, kind: "account" },
+    { label: "Add asset", icon: Landmark, kind: "asset" },
+    { label: "Add liability", icon: CreditCard, kind: "liability" },
+    { label: "Pay EMI", icon: Banknote, kind: "emi" },
+    { label: "Dividend", icon: Sparkles, kind: "dividend" },
+    { label: "Refund", icon: RotateCcw, kind: "refund" },
+    { label: "Create goal", icon: Target, kind: "goal" },
+    { label: "Add bill", icon: Receipt, kind: "bill" },
+  ];
+
   return (
-    <Card className="border-border/70">
-      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div className="text-sm font-medium">Quick actions</div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
-          <Button variant="secondary" size="sm" onClick={() => openDialog("income")}>
-            <ArrowDownCircle className="mr-1.5 h-4 w-4 text-primary" />
-            Add income
+    <div className="flex shrink-0 items-center gap-2">
+      <Button size="sm" onClick={() => openDialog("expense")}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        <span className="hidden sm:inline">Add transaction</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" aria-label="More actions">
+            More
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => openDialog("expense")}>
-            <ArrowUpCircle className="mr-1.5 h-4 w-4 text-destructive" />
-            Add expense
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openDialog("transfer")}>
-            <ArrowLeftRight className="mr-1.5 h-4 w-4" />
-            Transfer
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openDialog("investment")}>
-            <TrendingUp className="mr-1.5 h-4 w-4" />
-            Add investment
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="col-span-2">
-                More
-                <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => openDialog("account")}>
-                <Wallet className="mr-2 h-4 w-4" /> Add account
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("asset")}>
-                <Landmark className="mr-2 h-4 w-4" /> Add asset
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("liability")}>
-                <CreditCard className="mr-2 h-4 w-4" /> Add liability
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("emi")}>
-                <Banknote className="mr-2 h-4 w-4" /> Pay EMI
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("dividend")}>
-                <Sparkles className="mr-2 h-4 w-4" /> Dividend
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("refund")}>
-                <RotateCcw className="mr-2 h-4 w-4" /> Refund
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("goal")}>
-                <Target className="mr-2 h-4 w-4" /> Create goal
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("bill")}>
-                <Receipt className="mr-2 h-4 w-4" /> Add bill
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardContent>
-    </Card>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
+          {more.map((m) => (
+            <DropdownMenuItem key={m.label} onSelect={() => openDialog(m.kind)}>
+              <m.icon className="mr-2 h-4 w-4" /> {m.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

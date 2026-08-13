@@ -43,6 +43,26 @@ export function WidgetError({
 }
 
 /** Genuinely empty (new user) — distinct from loading and from failure. */
-export function WidgetEmpty({ message, className }: { message: string; className?: string }) {
-  return <p className={cn("py-4 text-sm text-muted-foreground", className)}>{message}</p>;
+export function WidgetEmpty({
+  message,
+  className,
+  actionLabel,
+  onAction,
+}: {
+  message: string;
+  className?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  if (!actionLabel || !onAction) {
+    return <p className={cn("py-4 text-sm text-muted-foreground", className)}>{message}</p>;
+  }
+  return (
+    <div className={cn("flex flex-col items-start gap-3 py-4", className)}>
+      <p className="text-sm text-muted-foreground">{message}</p>
+      <Button variant="outline" size="sm" onClick={onAction}>
+        {actionLabel}
+      </Button>
+    </div>
+  );
 }
