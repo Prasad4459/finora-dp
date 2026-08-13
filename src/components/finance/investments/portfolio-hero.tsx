@@ -120,7 +120,7 @@ export function PortfolioHero({
                   tone={positive ? "positive" : "negative"}
                 />
                 <Metric
-                  label="Monthly contributions"
+                  label="Monthly SIP"
                   value={formatINR(monthlyOutflow)}
                   hint={monthlyOutflow > 0 ? "SIP / recurring" : "None scheduled"}
                 />
