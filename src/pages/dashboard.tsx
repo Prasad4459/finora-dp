@@ -25,6 +25,7 @@ import {
   ChevronRight,
   CalendarDays,
 } from "lucide-react";
+import { MessageSquare, Compass, Info } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -48,6 +49,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -127,6 +129,7 @@ export function Dashboard() {
         <>
           <NetWorthHero />
           <NeedsAttention />
+          <DiscoveryCards />
           <CashFlowCard />
           <div className="grid gap-4 lg:grid-cols-3">
             <SpendingCard />
