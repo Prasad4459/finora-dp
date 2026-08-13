@@ -271,7 +271,7 @@ export function EntityDialogs({
       key: "avgCost",
       label: "Average cost per unit (₹)",
       type: "number",
-      placeholder: "Leave empty to derive from invested ÷ units",
+      placeholder: "Optional",
       showWhen: shows("avgCost"),
     },
     lastPrice: {
