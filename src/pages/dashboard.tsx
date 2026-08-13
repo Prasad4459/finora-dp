@@ -9,7 +9,6 @@
 import {
   Wallet,
   ArrowDownCircle,
-  ArrowUpCircle,
   TrendingUp,
   Plus,
   Landmark,
@@ -18,7 +17,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Target,
-  PiggyBank,
   Sparkles,
   Receipt,
   ArrowLeftRight,
@@ -45,7 +43,6 @@ import {
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useFinanceGreeting } from "@/components/finance/use-greeting";
-import { StatCard } from "@/components/finance/stat-card";
 import { WidgetEmpty, WidgetError, WidgetSkeleton } from "@/components/finance/widget-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +65,6 @@ import {
   buildBreakdown,
   buildCashFlowSeries,
   buildNetWorthSeries,
-  changePct,
 } from "@/services/dashboard";
 import { IST_TIMEZONE } from "@/lib/date-in";
 import { TRANSACTION_LABEL } from "@/lib/transaction-view";
@@ -420,13 +416,11 @@ function GettingStarted() {
 
 function CashFlowCard() {
   const summary = useSummaryWidget();
-  const { month, previousMonth } = useMonthComparison();
   const data = useMemo(
     () => buildCashFlowSeries(summary.series(TREND_MONTHS)),
     [summary.categoryRows, summary.isLoading, summary.current.year, summary.current.month],
   );
   const hasActivity = data.some((d) => d.income > 0 || d.expense > 0);
-  const spendChange = changePct(month.consumptionExpense, previousMonth.consumptionExpense);
 
   return (
     <Card className="border-border/70">
@@ -447,7 +441,7 @@ function CashFlowCard() {
         ) : summary.isLoading ? (
           <WidgetSkeleton lines={6} className="h-[260px]" />
         ) : !hasActivity ? (
-          <WidgetEmpty message="No income or expenses recorded yet." />
+          <WidgetEmpty message="No income or expenses recorded yet — add a transaction to see your cash flow." />
         ) : (
           <>
             <div className="h-[260px] w-full min-w-0 overflow-hidden">
@@ -492,7 +486,7 @@ function SpendingCard() {
         ) : summary.isLoading ? (
           <WidgetSkeleton lines={5} className="h-[200px]" />
         ) : slices.length === 0 ? (
-          <WidgetEmpty message="No spending recorded this month." />
+          <WidgetEmpty message="No spending recorded this month — your category breakdown appears here." />
         ) : (
           <>
             <div className="relative h-[190px] w-full min-w-0 overflow-hidden">
@@ -644,7 +638,12 @@ function GoalsCard() {
         ) : isLoading ? (
           <WidgetSkeleton lines={4} />
         ) : top.length === 0 ? (
-          <WidgetEmpty message="No goals yet — create one to start tracking progress." className="py-0" />
+          <WidgetEmpty
+            message="Set a goal — an emergency fund or a big purchase — to track progress here."
+            actionLabel="Create goal"
+            onAction={() => openDialog("goal")}
+            className="py-0"
+          />
         ) : (
           top.map((g) => {
             const pct = percentOf(g.current, g.target);
@@ -684,10 +683,10 @@ function HealthCard() {
     <Card className="border-border/70">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div>
-          <CardTitle className="text-base font-semibold">Financial health</CardTitle>
+          <CardTitle className="text-sm font-semibold">Financial health</CardTitle>
           <p className="text-sm text-muted-foreground">Savings, debt & emergency fund</p>
         </div>
-        <Sparkles className="h-4 w-4 text-primary" />
+        <Sparkles className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>
         {sheet.isError ? (
@@ -704,14 +703,16 @@ function HealthCard() {
           </div>
         ) : (
           <>
-            <div className="flex items-end gap-2">
-              <div className="font-display text-5xl font-semibold tracking-tight">{health.score}</div>
-              <div className="pb-1 text-sm text-muted-foreground">/ 100</div>
+            <div className="flex items-center gap-2">
+              <div className="font-display text-xl font-semibold tabular-nums tracking-tight">
+                {health.score}
+                <span className="ml-0.5 text-sm font-normal text-muted-foreground">/ 100</span>
+              </div>
               <Badge variant="secondary" className="ml-auto">
                 {health.label}
               </Badge>
             </div>
-            <Progress value={health.score} className="mt-4 h-2" />
+            <Progress value={health.score} className="mt-3 h-1.5" />
             <ul className="mt-4 space-y-3">
               {health.pillars.map((p) => (
                 <li key={p.key}>
@@ -750,6 +751,7 @@ function HealthCard() {
 
 function RecentTransactionsCard() {
   const { transactions, isLoading, isError, refetch } = useRecentActivity();
+  const { openDialog } = useFinance();
   const rows = transactions.slice(0, 8);
   return (
     <Card className="border-border/70 lg:col-span-2">
@@ -774,14 +776,21 @@ function RecentTransactionsCard() {
         ) : (
           <ul className="divide-y divide-border">
             {rows.length === 0 && (
-              <li className="px-5 py-6 text-sm text-muted-foreground">No transactions yet.</li>
+              <li className="px-5 py-4">
+                <WidgetEmpty
+                  message="Start tracking your money to see your financial activity here."
+                  actionLabel="Add transaction"
+                  onAction={() => openDialog("expense")}
+                  className="py-0"
+                />
+              </li>
             )}
             {rows.map((t) => {
               const positive = t.direction === "in";
               const neutral = t.direction === "neutral";
               const Icon = positive ? ArrowDownCircle : neutral ? ArrowLeftRight : ShoppingBag;
               return (
-                <li key={t.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={t.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
                   <div
                     className={cn(
                       "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
@@ -796,17 +805,17 @@ function RecentTransactionsCard() {
                       {TRANSACTION_LABEL[t.type]} • {t.category} • {t.account}
                     </div>
                   </div>
-                  <div className="hidden text-xs text-muted-foreground sm:block">{formatDateIN(t.date)}</div>
+                  <div className="hidden text-xs text-muted-foreground lg:block">{formatDateIN(t.date)}</div>
                   <div
                     className={cn(
-                      "flex items-center gap-1 text-sm font-semibold tabular-nums",
+                      "flex shrink-0 items-center gap-0.5 text-sm font-semibold tabular-nums",
                       positive ? "text-primary" : "text-foreground",
                     )}
                   >
                     {positive ? (
-                      <ArrowDownRight className="h-3.5 w-3.5" />
+                      <ArrowDownRight className="hidden h-3.5 w-3.5 sm:block" />
                     ) : (
-                      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      <ArrowUpRight className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
                     )}
                     {positive ? "+" : neutral ? "" : "-"}
                     {currency(Math.abs(t.amount))}
@@ -855,12 +864,14 @@ function UpcomingBillsCard() {
         ) : (
           <ul className="divide-y divide-border">
             {rows.length === 0 && (
-              <li className="px-5 py-6 text-sm text-muted-foreground">No bills due in the next 14 days.</li>
+              <li className="px-5 py-4 text-sm text-muted-foreground">
+                Nothing due in the next 14 days. Add a bill to get reminders before it's due.
+              </li>
             )}
             {rows.map((b) => {
               const Icon = b.icon ?? Receipt;
               return (
-                <li key={b.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={b.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                     <Icon className="h-4 w-4" />
                   </div>
