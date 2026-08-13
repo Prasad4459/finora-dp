@@ -616,7 +616,13 @@ function NetWorthCard() {
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle className="text-base font-semibold">Net worth</CardTitle>
-          <p className="text-sm text-muted-foreground">Trailing {TREND_MONTHS} months</p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-muted-foreground">Trailing {TREND_MONTHS} months</p>
+            <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px] font-normal text-muted-foreground">
+              <Info className="h-3 w-3" />
+              Reconstructed history
+            </Badge>
+          </div>
         </div>
         {!failed && !busy && (
           <div className="text-right">
@@ -642,6 +648,7 @@ function NetWorthCard() {
         ) : !hasHistory ? (
           <WidgetEmpty message="Add an account or a transaction to start tracking net worth." />
         ) : (
+          <>
           <div className="h-[250px] w-full min-w-0 overflow-hidden">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
@@ -655,10 +662,29 @@ function NetWorthCard() {
                 <XAxis dataKey="month" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={formatINRCompact} />
                 <Tooltip content={<ChartTooltip valueFormatter={currencyExact} />} />
-                <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} fill="url(#nw)" />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--chart-1)"
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  fill="url(#nw)"
+                  dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                    props.index === data.length - 1 ? (
+                      <circle key="today" cx={props.cx} cy={props.cy} r={4} fill="var(--chart-1)" />
+                    ) : (
+                      <g key={props.index} />
+                    )
+                  }
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Only today's net worth ({currency(netWorth)}, solid point) is measured. Earlier months are
+            reconstructed by removing each month's recorded ledger activity — not historical snapshots.
+          </p>
+          </>
         )}
       </CardContent>
     </Card>
