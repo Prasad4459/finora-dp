@@ -362,16 +362,6 @@ function NeedsAttention() {
   );
 }
 
-function BriefMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-1 truncate font-display text-lg font-semibold tabular-nums">{value}</div>
-      {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
-    </div>
-  );
-}
-
 function InsightRow({ insight }: { insight: Insight }) {
   return (
     <li className="flex items-start gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm">
@@ -426,61 +416,6 @@ function GettingStarted() {
   );
 }
 
-/* --------------------------- financial overview --------------------------- */
-
-function FinancialOverview() {
-  const sheet = useBalanceSheet();
-  const bills = useBillsWidget();
-  const { month } = useMonthComparison();
-  const t = sheet.totals;
-  const state = cardState(sheet);
-  const nwChange = netWorthChange(month);
-
-  const billsDelta = bills.outlook.overdueCount
-    ? `${bills.outlook.overdueCount} overdue`
-    : `${bills.count} bill${bills.count === 1 ? "" : "s"} due soon`;
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        label="Net worth"
-        value={currency(t.netWorth)}
-        delta={`${nwChange >= 0 ? "+" : "−"}${currency(Math.abs(nwChange))} this month`}
-        icon={TrendingUp}
-        tone={nwChange >= 0 ? "positive" : "negative"}
-        state={state}
-        onRetry={sheet.refetch}
-      />
-      <StatCard
-        label="Available balance"
-        value={currency(t.totalBalance)}
-        delta={`Across ${sheet.accountCount} account${sheet.accountCount === 1 ? "" : "s"}`}
-        icon={Wallet}
-        state={state}
-        onRetry={sheet.refetch}
-      />
-      <StatCard
-        label="Monthly savings"
-        value={currency(t.monthSavings)}
-        delta={`${t.savingsRate}% savings rate`}
-        icon={PiggyBank}
-        tone={t.monthSavings >= 0 ? "positive" : "negative"}
-        state={state}
-        onRetry={sheet.refetch}
-      />
-      <StatCard
-        label="Upcoming bills"
-        value={currency(bills.total)}
-        delta={billsDelta}
-        icon={Receipt}
-        tone={bills.outlook.overdueCount ? "negative" : "neutral"}
-        state={cardState(bills)}
-        onRetry={bills.refetch}
-      />
-    </div>
-  );
-}
-
 /* -------------------------------- cash flow ------------------------------- */
 
 function CashFlowCard() {
@@ -527,16 +462,6 @@ function CashFlowCard() {
                   <Line type="monotone" dataKey="savings" stroke="var(--chart-3)" strokeWidth={2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 border-t border-border/70 pt-4 sm:grid-cols-4">
-              <BriefMetric label="Income this month" value={currency(month.grossIncome)} />
-              <BriefMetric label="Expenses this month" value={currency(month.consumptionExpense)} />
-              <BriefMetric label="Savings this month" value={currency(month.savings)} hint={`${month.savingsRate}% rate`} />
-              <BriefMetric
-                label="vs last month"
-                value={spendChange === null ? "—" : `${spendChange > 0 ? "+" : ""}${spendChange}%`}
-                hint={spendChange === null ? "No spending last month" : "Change in spending"}
-              />
             </div>
           </>
         )}
@@ -884,7 +809,7 @@ function RecentTransactionsCard() {
                       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
                     {positive ? "+" : neutral ? "" : "-"}
-                    {currencyExact(Math.abs(t.amount))}
+                    {currency(Math.abs(t.amount))}
                   </div>
                 </li>
               );
@@ -948,7 +873,7 @@ function UpcomingBillsCard() {
                       {URGENCY_LABEL[b.urgency]} · {formatDateIN(b.dueISO)}
                     </Badge>
                   </div>
-                  <div className="text-sm font-semibold tabular-nums">{currencyExact(b.amount)}</div>
+                  <div className="shrink-0 text-sm font-semibold tabular-nums">{currency(b.amount)}</div>
                 </li>
               );
             })}
@@ -969,64 +894,43 @@ function UpcomingBillsCard() {
 
 function QuickActions() {
   const { openDialog } = useFinance();
+  const more: Array<{ label: string; icon: typeof Wallet; kind: Parameters<typeof openDialog>[0] }> = [
+    { label: "Add income", icon: ArrowDownCircle, kind: "income" },
+    { label: "Transfer", icon: ArrowLeftRight, kind: "transfer" },
+    { label: "Add investment", icon: TrendingUp, kind: "investment" },
+    { label: "Add account", icon: Wallet, kind: "account" },
+    { label: "Add asset", icon: Landmark, kind: "asset" },
+    { label: "Add liability", icon: CreditCard, kind: "liability" },
+    { label: "Pay EMI", icon: Banknote, kind: "emi" },
+    { label: "Dividend", icon: Sparkles, kind: "dividend" },
+    { label: "Refund", icon: RotateCcw, kind: "refund" },
+    { label: "Create goal", icon: Target, kind: "goal" },
+    { label: "Add bill", icon: Receipt, kind: "bill" },
+  ];
+
   return (
-    <Card className="border-border/70">
-      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div className="text-sm font-medium">Quick actions</div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
-          <Button variant="secondary" size="sm" onClick={() => openDialog("income")}>
-            <ArrowDownCircle className="mr-1.5 h-4 w-4 text-primary" />
-            Add income
+    <div className="flex shrink-0 items-center gap-2">
+      <Button size="sm" onClick={() => openDialog("expense")}>
+        <Plus className="mr-1.5 h-4 w-4" />
+        <span className="hidden sm:inline">Add transaction</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" aria-label="More actions">
+            More
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
           </Button>
-          <Button variant="secondary" size="sm" onClick={() => openDialog("expense")}>
-            <ArrowUpCircle className="mr-1.5 h-4 w-4 text-destructive" />
-            Add expense
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openDialog("transfer")}>
-            <ArrowLeftRight className="mr-1.5 h-4 w-4" />
-            Transfer
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => openDialog("investment")}>
-            <TrendingUp className="mr-1.5 h-4 w-4" />
-            Add investment
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="col-span-2">
-                More
-                <ChevronRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => openDialog("account")}>
-                <Wallet className="mr-2 h-4 w-4" /> Add account
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("asset")}>
-                <Landmark className="mr-2 h-4 w-4" /> Add asset
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("liability")}>
-                <CreditCard className="mr-2 h-4 w-4" /> Add liability
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("emi")}>
-                <Banknote className="mr-2 h-4 w-4" /> Pay EMI
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("dividend")}>
-                <Sparkles className="mr-2 h-4 w-4" /> Dividend
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("refund")}>
-                <RotateCcw className="mr-2 h-4 w-4" /> Refund
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("goal")}>
-                <Target className="mr-2 h-4 w-4" /> Create goal
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => openDialog("bill")}>
-                <Receipt className="mr-2 h-4 w-4" /> Add bill
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardContent>
-    </Card>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
+          {more.map((m) => (
+            <DropdownMenuItem key={m.label} onSelect={() => openDialog(m.kind)}>
+              <m.icon className="mr-2 h-4 w-4" /> {m.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
