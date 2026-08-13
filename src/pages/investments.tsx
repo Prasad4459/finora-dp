@@ -35,7 +35,7 @@ export function Investments() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-hidden">
-      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+      <header className="space-y-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-3 sm:space-y-0">
         <div className="min-w-0">
           <h1 className="break-words font-display text-2xl font-semibold tracking-tight sm:text-3xl">
             Investments &amp; Savings
@@ -44,7 +44,7 @@ export function Investments() {
             Mutual funds, equities, deposits, small savings and gold — one portfolio.
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
           <Button size="sm" variant="outline" onClick={() => openDialog("sip")}>
             <Repeat className="mr-1 h-4 w-4" /> Contribution
           </Button>
