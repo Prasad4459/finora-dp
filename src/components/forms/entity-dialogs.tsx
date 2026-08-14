@@ -359,15 +359,15 @@ export function EntityDialogs({
   ];
 
   const billFields: FieldDef[] = [
-    { key: "name", label: "Bill name", type: "text", required: true },
+    { key: "name", label: "Bill name", type: "text", required: true, placeholder: "e.g. Rent, Airtel postpaid, Home loan EMI" },
     { key: "category", label: "Category", type: "select", options: BILL_CATEGORIES as unknown as string[], required: true },
     { key: "iconKey", label: "Icon", type: "select", options: BILL_ICON_KEYS as unknown as string[], default: "Receipt" },
-    { key: "amount", label: "Expected amount (₹)", type: "number", required: true },
-    { key: "due", label: "Next due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true },
-    { key: "frequency", label: "Recurrence", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true },
+    { key: "amount", label: "Expected amount (₹)", type: "number", required: true, hint: "Usual amount — you can pay a different amount when marking it paid" },
+    { key: "due", label: "Next due date (DD/MM/YYYY)", type: "text", default: todayDMY(), required: true, hint: "The date this bill is next payable" },
+    { key: "frequency", label: "Repeats", type: "select", options: FREQUENCY_OPTIONS, default: "Monthly", required: true, hint: "Choose One-time for a bill that will not repeat" },
     walletField("walletId", "Pay from account", { required: false }),
-    { key: "reminderEnabled", label: "Reminders", type: "switch", default: "true" },
-    { key: "reminderDays", label: "Remind me (days before)", type: "number", default: "3" },
+    { key: "reminderEnabled", label: "In-app reminders", type: "switch", default: "true", hint: "Shows a notification before the due date" },
+    { key: "reminderDays", label: "Remind me (days before)", type: "number", default: "3", showWhen: (v) => Boolean(v.reminderEnabled), hint: "Reminders also appear on the due date and while overdue" },
     { key: "description", label: "Notes", type: "textarea", placeholder: "Optional" },
   ];
 
