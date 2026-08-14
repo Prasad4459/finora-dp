@@ -13,6 +13,7 @@ export type LiabilityRow = Tables<"liabilities">;
 export type GoalRow = Tables<"goals">;
 export type BudgetRow = Tables<"budgets">;
 export type BillRow = Tables<"bills">;
+export type BillPaymentRow = Tables<"bill_payments">;
 export type Notification = Tables<"notifications">;
 
 // ---- Insert types ----
