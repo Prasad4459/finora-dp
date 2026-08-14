@@ -3,7 +3,6 @@ import { AlertTriangle, BellRing, CalendarClock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { WidgetEmpty, WidgetError, WidgetSkeleton } from "@/components/finance/widget-state";
 import { formatINR } from "@/lib/format";
-import { isoToDMY } from "@/lib/finance-mappers";
 import { cn } from "@/lib/utils";
 import { UPCOMING_WINDOW_DAYS } from "@/services/bills";
 
@@ -132,5 +131,3 @@ export function BillsHero({
     </Card>
   );
 }
-
-export const dmy = isoToDMY;
