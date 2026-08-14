@@ -196,8 +196,8 @@ function BillRowCard({
               {item.payable ? "Mark paid" : "Paid"}
             </Button>
             <Button size="sm" variant="ghost" onClick={onToggleHistory}>
-              <History className="mr-1 h-3.5 w-3.5" />
-              {historyOpen ? "Hide history" : "History"}
+              <History className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">{historyOpen ? "Hide history" : "History"}</span>
             </Button>
             <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Edit ${item.name}`} onClick={onEdit}>
               <Pencil className="h-3.5 w-3.5" />
