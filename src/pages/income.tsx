@@ -1,12 +1,11 @@
-import { Plus, ArrowDownCircle, TrendingUp, Calendar, Trash2, Pencil, RotateCcw } from "lucide-react";
+import { Plus, ArrowDownCircle, TrendingUp, Calendar, RotateCcw } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
+import { LedgerSection, type LedgerRow } from "@/components/finance/transactions/ledger-section";
+import { formatINR, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
 import { useLedger } from "@/hooks/use-ledger";
 import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
@@ -16,7 +15,8 @@ const TREND_MONTHS = 6;
 export function Income() {
   const { openDialog, openEditDialog, removeIncome, totals, summary } = useFinance();
   // Paginated ledger lives in its own hook so pages without a ledger never load it.
-  const { incomes, hasMore: hasMoreTransactions, isLoadingMore: isLoadingMoreTransactions, loadMore: loadMoreTransactions } = useLedger();
+  const ledger = useLedger();
+  const { incomes } = ledger;
   // All totals below come from server-side aggregates, not the loaded page.
   const monthTotal = totals.monthIncome;
   const previous = summary.metricsFor(addMonths(summary.current, -1)).grossIncome;
@@ -32,6 +32,16 @@ export function Income() {
   const trend = summary.series(TREND_MONTHS).map(({ ref, metrics }) => ({
     month: monthShortLabel(ref),
     value: metrics.grossIncome,
+  }));
+  const rows: LedgerRow[] = incomes.map((i) => ({
+    id: i.id,
+    date: i.date,
+    title: i.source,
+    category: i.category,
+    account: i.account,
+    amount: i.amount,
+    recurring: i.recurring,
+    txType: i.txType ?? "income",
   }));
   return (
     <div className="mx-auto max-w-7xl">
@@ -82,46 +92,25 @@ export function Income() {
         </CardContent>
       </Card>
 
-      <Card className="mt-6 border-border/70">
-        <CardHeader><CardTitle className="text-base font-semibold">All income</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {incomes.map((i) => (
-                <TableRow key={i.id}>
-                  <TableCell className="text-muted-foreground">{formatDateIN(i.date)}</TableCell>
-                  <TableCell className="font-medium">
-                    {i.source}
-                    {i.txType === "refund" && <Badge variant="secondary" className="ml-2 text-[10px]">Refund</Badge>}
-                    {i.recurring && <Badge variant="secondary" className="ml-2 text-[10px]">Recurring</Badge>}
-                  </TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{i.category}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground">{i.account}</TableCell>
-                  <TableCell className="text-right font-semibold text-primary tabular-nums">+{formatINR(i.amount)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "income", entity: i })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeIncome(i.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {hasMoreTransactions && (
-            <div className="flex justify-center p-3">
-              <Button variant="ghost" size="sm" disabled={isLoadingMoreTransactions} onClick={loadMoreTransactions}>
-                {isLoadingMoreTransactions ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <LedgerSection
+        title="All inflows"
+        rows={rows}
+        direction="in"
+        isLoading={ledger.isLoading}
+        isError={ledger.isError}
+        onRetry={ledger.refetch}
+        hasMore={ledger.hasMore}
+        isLoadingMore={ledger.isLoadingMore}
+        loadMore={ledger.loadMore}
+        emptyMessage="No income recorded yet. Add your salary or a payout to get started."
+        emptyActionLabel="Add income"
+        onEmptyAction={() => openDialog("income")}
+        onEdit={(row) => {
+          const entity = incomes.find((i) => i.id === row.id);
+          if (entity) openEditDialog({ kind: "income", entity });
+        }}
+        onDelete={(id) => removeIncome(id)}
+      />
     </div>
   );
 }

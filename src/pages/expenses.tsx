@@ -1,12 +1,11 @@
-import { Plus, ArrowUpCircle, TrendingDown, Calendar, Trash2, Pencil } from "lucide-react";
+import { Plus, ArrowUpCircle, TrendingDown, Calendar } from "lucide-react";
 import { Bar, BarChart, Cell, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
+import { LedgerSection, type LedgerRow } from "@/components/finance/transactions/ledger-section";
+import { formatINR, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
 import { useLedger } from "@/hooks/use-ledger";
 import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
@@ -17,7 +16,8 @@ const TREND_MONTHS = 6;
 export function Expenses() {
   const { openDialog, openEditDialog, removeExpense, totals, summary } = useFinance();
   // Paginated ledger lives in its own hook so pages without a ledger never load it.
-  const { expenses, hasMore: hasMoreTransactions, isLoadingMore: isLoadingMoreTransactions, loadMore: loadMoreTransactions } = useLedger();
+  const ledger = useLedger();
+  const { expenses } = ledger;
   // Server-side aggregates only — the table below is paginated and can never
   // be used to compute a total.
   const monthTotal = totals.monthExpenses;
@@ -34,6 +34,16 @@ export function Expenses() {
     name: c.name,
     value: c.net,
     color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+  const rows: LedgerRow[] = expenses.map((e) => ({
+    id: e.id,
+    date: e.date,
+    title: e.merchant,
+    category: e.category,
+    account: e.account,
+    method: e.method,
+    amount: e.amount,
+    txType: e.txType ?? "expense",
   }));
   return (
     <div className="mx-auto max-w-7xl">
@@ -92,44 +102,26 @@ export function Expenses() {
         </Card>
       </div>
 
-      <Card className="mt-6 border-border/70">
-        <CardHeader><CardTitle className="text-base font-semibold">All expenses</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Merchant</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expenses.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-muted-foreground">{formatDateIN(e.date)}</TableCell>
-                  <TableCell className="font-medium">{e.merchant}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{e.category}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground">{e.account}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.method}</TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">-{formatINR(e.amount)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "expense", entity: e })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeExpense(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {hasMoreTransactions && (
-            <div className="flex justify-center p-3">
-              <Button variant="ghost" size="sm" disabled={isLoadingMoreTransactions} onClick={loadMoreTransactions}>
-                {isLoadingMoreTransactions ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <LedgerSection
+        title="All outflows"
+        rows={rows}
+        direction="out"
+        showMethod
+        isLoading={ledger.isLoading}
+        isError={ledger.isError}
+        onRetry={ledger.refetch}
+        hasMore={ledger.hasMore}
+        isLoadingMore={ledger.isLoadingMore}
+        loadMore={ledger.loadMore}
+        emptyMessage="No expenses recorded yet. Add your first one to see where your money goes."
+        emptyActionLabel="Add expense"
+        onEmptyAction={() => openDialog("expense")}
+        onEdit={(row) => {
+          const entity = expenses.find((e) => e.id === row.id);
+          if (entity) openEditDialog({ kind: "expense", entity });
+        }}
+        onDelete={(id) => removeExpense(id)}
+      />
     </div>
   );
 }

@@ -45,8 +45,12 @@ export function useLedger() {
         .map((t) => {
           const row = toExpense(t, categoryName(t.category_id), walletName(t.wallet_id));
           return t.type === "expense"
-            ? row
-            : { ...row, category: t.type === "emi" ? "EMI" : "Investment" };
+            ? { ...row, txType: t.type }
+            : {
+                ...row,
+                txType: t.type,
+                category: t.type === "emi" ? "EMI" : "Investment",
+              };
         }),
     [txRows, categoryRows, walletRows],
   );
