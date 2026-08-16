@@ -102,44 +102,26 @@ export function Expenses() {
         </Card>
       </div>
 
-      <Card className="mt-6 border-border/70">
-        <CardHeader><CardTitle className="text-base font-semibold">All expenses</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Merchant</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Method</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expenses.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-muted-foreground">{formatDateIN(e.date)}</TableCell>
-                  <TableCell className="font-medium">{e.merchant}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{e.category}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground">{e.account}</TableCell>
-                  <TableCell className="text-muted-foreground">{e.method}</TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">-{formatINR(e.amount)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "expense", entity: e })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeExpense(e.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {hasMoreTransactions && (
-            <div className="flex justify-center p-3">
-              <Button variant="ghost" size="sm" disabled={isLoadingMoreTransactions} onClick={loadMoreTransactions}>
-                {isLoadingMoreTransactions ? "Loading..." : "Load more"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <LedgerSection
+        title="All outflows"
+        rows={rows}
+        direction="out"
+        showMethod
+        isLoading={ledger.isLoading}
+        isError={ledger.isError}
+        onRetry={ledger.refetch}
+        hasMore={ledger.hasMore}
+        isLoadingMore={ledger.isLoadingMore}
+        loadMore={ledger.loadMore}
+        emptyMessage="No expenses recorded yet. Add your first one to see where your money goes."
+        emptyActionLabel="Add expense"
+        onEmptyAction={() => openDialog("expense")}
+        onEdit={(row) => {
+          const entity = expenses.find((e) => e.id === row.id);
+          if (entity) openEditDialog({ kind: "expense", entity });
+        }}
+        onDelete={(id) => removeExpense(id)}
+      />
     </div>
   );
 }
