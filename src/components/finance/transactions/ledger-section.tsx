@@ -178,7 +178,7 @@ export function LedgerSection({
 
   return (
     <Card className="mt-6 border-border/70">
-      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
+      <CardHeader className="block">
         <div className="min-w-0">
           <CardTitle className="truncate text-base font-semibold">{title}</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
