@@ -1,12 +1,11 @@
-import { Plus, ArrowDownCircle, TrendingUp, Calendar, Trash2, Pencil, RotateCcw } from "lucide-react";
+import { Plus, ArrowDownCircle, TrendingUp, Calendar, RotateCcw } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
+import { LedgerSection, type LedgerRow } from "@/components/finance/transactions/ledger-section";
+import { formatINR, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
 import { useLedger } from "@/hooks/use-ledger";
 import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
@@ -16,7 +15,8 @@ const TREND_MONTHS = 6;
 export function Income() {
   const { openDialog, openEditDialog, removeIncome, totals, summary } = useFinance();
   // Paginated ledger lives in its own hook so pages without a ledger never load it.
-  const { incomes, hasMore: hasMoreTransactions, isLoadingMore: isLoadingMoreTransactions, loadMore: loadMoreTransactions } = useLedger();
+  const ledger = useLedger();
+  const { incomes } = ledger;
   // All totals below come from server-side aggregates, not the loaded page.
   const monthTotal = totals.monthIncome;
   const previous = summary.metricsFor(addMonths(summary.current, -1)).grossIncome;
@@ -32,6 +32,16 @@ export function Income() {
   const trend = summary.series(TREND_MONTHS).map(({ ref, metrics }) => ({
     month: monthShortLabel(ref),
     value: metrics.grossIncome,
+  }));
+  const rows: LedgerRow[] = incomes.map((i) => ({
+    id: i.id,
+    date: i.date,
+    title: i.source,
+    category: i.category,
+    account: i.account,
+    amount: i.amount,
+    recurring: i.recurring,
+    txType: i.txType ?? "income",
   }));
   return (
     <div className="mx-auto max-w-7xl">
