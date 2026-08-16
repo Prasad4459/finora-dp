@@ -1,12 +1,11 @@
-import { Plus, ArrowUpCircle, TrendingDown, Calendar, Trash2, Pencil } from "lucide-react";
+import { Plus, ArrowUpCircle, TrendingDown, Calendar } from "lucide-react";
 import { Bar, BarChart, Cell, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatINR, formatINRCompact, formatDateIN } from "@/lib/format";
+import { LedgerSection, type LedgerRow } from "@/components/finance/transactions/ledger-section";
+import { formatINR, formatINRCompact } from "@/lib/format";
 import { useFinance } from "@/store/finance-store";
 import { useLedger } from "@/hooks/use-ledger";
 import { addMonths, monthShortLabel, todayISO } from "@/lib/date-in";
@@ -17,7 +16,8 @@ const TREND_MONTHS = 6;
 export function Expenses() {
   const { openDialog, openEditDialog, removeExpense, totals, summary } = useFinance();
   // Paginated ledger lives in its own hook so pages without a ledger never load it.
-  const { expenses, hasMore: hasMoreTransactions, isLoadingMore: isLoadingMoreTransactions, loadMore: loadMoreTransactions } = useLedger();
+  const ledger = useLedger();
+  const { expenses } = ledger;
   // Server-side aggregates only — the table below is paginated and can never
   // be used to compute a total.
   const monthTotal = totals.monthExpenses;
@@ -34,6 +34,16 @@ export function Expenses() {
     name: c.name,
     value: c.net,
     color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+  const rows: LedgerRow[] = expenses.map((e) => ({
+    id: e.id,
+    date: e.date,
+    title: e.merchant,
+    category: e.category,
+    account: e.account,
+    method: e.method,
+    amount: e.amount,
+    txType: e.txType ?? "expense",
   }));
   return (
     <div className="mx-auto max-w-7xl">
