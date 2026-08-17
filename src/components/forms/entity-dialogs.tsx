@@ -345,11 +345,11 @@ export function EntityDialogs({
   ];
 
   const goalFields: FieldDef[] = [
-    { key: "name", label: "Goal name", type: "text", required: true },
-    { key: "iconKey", label: "Icon", type: "select", options: GOAL_ICON_KEYS as unknown as string[], default: "PiggyBank" },
-    { key: "target", label: "Target amount (₹)", type: "number", required: true },
-    { key: "current", label: "Saved so far (₹)", type: "number", default: "0" },
-    { key: "date", label: "Target date", type: "date", default: today },
+    { key: "name", label: "Goal name", type: "text", required: true, placeholder: "e.g. Emergency fund, Goa trip, Home down payment" },
+    { key: "iconKey", label: "Icon", type: "select", options: GOAL_ICON_KEYS as unknown as string[], default: "PiggyBank", hint: "Shown on the goal card" },
+    { key: "target", label: "Target amount (₹)", type: "number", required: true, hint: "How much this goal needs in total" },
+    { key: "current", label: "Saved so far (₹)", type: "number", default: "0", hint: "Money already set aside. Later contributions are added from the Contribute action." },
+    { key: "date", label: "Target date", type: "date", default: today, hint: "When you want the full amount ready" },
   ];
 
   const budgetFields: FieldDef[] = [
@@ -434,9 +434,9 @@ export function EntityDialogs({
 
   const contributionFields: FieldDef[] = [
     { key: "goal", label: "Goal", type: "select", options: goalNames, required: true },
-    walletField("walletId", "Paid from account"),
-    walletField("to", "Held in account"),
-    { key: "amount", label: "Amount (₹)", type: "number", required: true },
+    walletField("walletId", "Paid from account", { hint: "Money leaves this account" }),
+    walletField("to", "Held in account", { hint: "Where the goal money now sits — must be a different account" }),
+    { key: "amount", label: "Amount (₹)", type: "number", required: true, hint: "Your net worth does not change — this only moves money" },
     { key: "date", label: "Date", type: "date", default: today },
   ];
 

@@ -18,6 +18,10 @@ export const transactionsRepo = {
   listByAsset: (assetId: string) =>
     repo.list({ filters: { asset_id: assetId }, orderBy: "transaction_date" }),
 
+  /** Every ledger row linked to one goal (contribution history). */
+  listByGoal: (goalId: string) =>
+    repo.list({ filters: { goal_id: goalId }, orderBy: "transaction_date" }),
+
   /**
    * Keyset-free offset pagination. Never loads the whole history into the
    * browser; callers request one page at a time.
