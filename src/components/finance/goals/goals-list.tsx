@@ -1,5 +1,5 @@
 // Presentation only — grouping, progress and timing are computed by the page.
-import { CalendarClock, CheckCircle2, History, IndianRupee, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, History, IndianRupee, Pencil, Plus, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -336,5 +336,3 @@ export function GoalsList({
     </div>
   );
 }
-
-export { CheckCircle2 as GoalReachedIcon };
