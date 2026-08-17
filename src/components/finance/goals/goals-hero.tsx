@@ -1,5 +1,5 @@
 // Presentation only — every figure is computed by the Goals page.
-import { PiggyBank, Target, TrendingUp } from "lucide-react";
+import { Target } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { WidgetEmpty, WidgetError, WidgetSkeleton } from "@/components/finance/widget-state";
@@ -25,7 +25,7 @@ function Metric({
       <div
         className={cn(
           "mt-1 truncate font-display text-lg font-semibold tabular-nums sm:text-xl",
-          tone === "positive" && "text-emerald-600 dark:text-emerald-400",
+          tone === "positive" && "text-primary",
           tone === "negative" && "text-destructive",
           tone === "primary" && "text-primary",
         )}
@@ -131,5 +131,3 @@ export function GoalsHero({
     </Card>
   );
 }
-
-export const GoalsHeroIcons = { PiggyBank, TrendingUp };
