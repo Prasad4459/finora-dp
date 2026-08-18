@@ -1,93 +1,178 @@
-import { Plus, Wallet, Landmark, CreditCard, Trash2, Pencil } from "lucide-react";
-import { PageHeader } from "@/components/finance/page-header";
-import { StatCard } from "@/components/finance/stat-card";
+import { useMemo, useState } from "react";
+import { ArrowLeftRight, Plus } from "lucide-react";
+import { AccountsHero, type AccountsHeroSlice } from "@/components/finance/accounts/accounts-hero";
+import {
+  AccountsList,
+  type AccountGroup,
+  type AccountItem,
+} from "@/components/finance/accounts/accounts-list";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
-import { formatINR, formatDateIN } from "@/lib/format";
+import { useWallets } from "@/hooks/use-wallets";
+import { useRecentTransactions } from "@/hooks/use-recent-transactions";
 import { useFinance } from "@/store/finance-store";
 
+const CREDIT_TYPES = new Set(["Credit Card", "Loan Account"]);
+const INVESTMENT_TYPES = new Set(["Investment Account"]);
 
 export function Accounts() {
   const { accounts, openDialog, openEditDialog, removeAccount } = useFinance();
-  const total = accounts.reduce((s, a) => s + a.balance, 0);
-  const assets = accounts.filter((a) => a.balance >= 0).reduce((s, a) => s + a.balance, 0);
-  const debt = accounts.filter((a) => a.balance < 0).reduce((s, a) => s + Math.abs(a.balance), 0);
+  const wallets = useWallets();
+  const recent = useRecentTransactions(50);
+  const [query, setQuery] = useState("");
+
+  // Read-only presentation: newest ledger date seen per wallet.
+  const lastActivity = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of recent.rows ?? []) {
+      const id = t.wallet_id;
+      const date = (t.transaction_date ?? "").slice(0, 10);
+      if (!id || !date) continue;
+      const prev = map.get(id);
+      if (!prev || date > prev) map.set(id, date);
+    }
+    return map;
+  }, [recent.rows]);
+
+  const items: AccountItem[] = useMemo(
+    () =>
+      accounts.map((a) => ({
+        id: a.id,
+        name: a.name,
+        institution: a.bank,
+        type: a.type,
+        balance: a.balance,
+        icon: a.icon,
+        color: a.color,
+        lastActivityISO: lastActivity.get(a.id) ?? null,
+        updatedISO: a.updated,
+        isCredit: CREDIT_TYPES.has(a.type),
+      })),
+    [accounts, lastActivity],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((i) =>
+      `${i.name} ${i.institution} ${i.type}`.toLowerCase().includes(q),
+    );
+  }, [items, query]);
+
+  const groups: AccountGroup[] = useMemo(() => {
+    const byBalance = (a: AccountItem, b: AccountItem) => Math.abs(b.balance) - Math.abs(a.balance);
+    return [
+      {
+        key: "everyday",
+        label: "Everyday money",
+        hint: "Bank, cash and UPI balances you can spend today",
+        tone: "primary" as const,
+        items: filtered
+          .filter((i) => !CREDIT_TYPES.has(i.type) && !INVESTMENT_TYPES.has(i.type))
+          .sort(byBalance),
+      },
+      {
+        key: "credit",
+        label: "Cards & loans",
+        hint: "What you owe — repayments post through the ledger",
+        tone: "destructive" as const,
+        items: filtered.filter((i) => CREDIT_TYPES.has(i.type)).sort(byBalance),
+      },
+      {
+        key: "investment",
+        label: "Investment accounts",
+        hint: "Accounts that fund your holdings and SIPs",
+        tone: "muted" as const,
+        items: filtered.filter((i) => INVESTMENT_TYPES.has(i.type)).sort(byBalance),
+      },
+    ];
+  }, [filtered]);
+
+  // A card/loan account holds what you owe, however its balance is signed —
+  // spendable money only ever comes from non-credit accounts.
+  const available = items
+    .filter((i) => !i.isCredit && i.balance > 0)
+    .reduce((s, i) => s + i.balance, 0);
+  const outstanding = items
+    .filter((i) => i.isCredit || i.balance < 0)
+    .reduce((s, i) => s + Math.abs(i.balance), 0);
+  const netPosition = available - outstanding;
+  const cashCount = items.filter(
+    (i) => !CREDIT_TYPES.has(i.type) && !INVESTMENT_TYPES.has(i.type),
+  ).length;
+  const creditCount = items.filter((i) => CREDIT_TYPES.has(i.type)).length;
+  const investmentCount = items.filter((i) => INVESTMENT_TYPES.has(i.type)).length;
+
+  const positiveIn = (pred: (i: AccountItem) => boolean) =>
+    items.filter((i) => pred(i) && i.balance > 0).reduce((s, i) => s + i.balance, 0);
+
+  const slices: AccountsHeroSlice[] = [
+    {
+      label: "Bank & cash",
+      amount: positiveIn((i) => !CREDIT_TYPES.has(i.type) && !INVESTMENT_TYPES.has(i.type)),
+      className: "bg-primary",
+    },
+    {
+      label: "Investment accounts",
+      amount: positiveIn((i) => INVESTMENT_TYPES.has(i.type)),
+      className: "bg-chart-2",
+    },
+  ];
+
+  const accountById = (id: string) => accounts.find((a) => a.id === id);
+
   return (
-    <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title="Wallets & Accounts"
-        description="All your bank, cash, and investment accounts."
-        actions={
+    <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-hidden">
+      <header className="space-y-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-3 sm:space-y-0">
+        <div className="min-w-0">
+          <h1 className="break-words font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+            Wallets &amp; Accounts
+          </h1>
+          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+            Every bank, cash, UPI, card and investment account in one place — balances stay in sync
+            with your ledger.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+          <Button size="sm" variant="outline" onClick={() => openDialog("transfer")}>
+            <ArrowLeftRight className="mr-1 h-4 w-4" /> Transfer
+          </Button>
           <Button size="sm" onClick={() => openDialog("account")}>
             <Plus className="mr-1 h-4 w-4" /> Add account
           </Button>
-        }
+        </div>
+      </header>
+
+      <AccountsHero
+        available={available}
+        outstanding={outstanding}
+        netPosition={netPosition}
+        accountCount={items.length}
+        cashCount={cashCount}
+        creditCount={creditCount}
+        investmentCount={investmentCount}
+        slices={slices}
+        isLoading={wallets.isLoading}
+        isError={wallets.isError}
+        onRetry={wallets.refetch}
+        onAdd={() => openDialog("account")}
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Net position" value={formatINR(total)} icon={Wallet} tone="positive" />
-        <StatCard label="Total in accounts" value={formatINR(assets)} icon={Landmark} />
-        <StatCard label="Card outstanding" value={formatINR(debt)} icon={CreditCard} tone="negative" />
-      </div>
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {accounts.map((a) => {
-          const Icon = a.icon;
-          return (
-            <Card key={a.id} className="border-border/70">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className={`grid h-10 w-10 place-items-center rounded-lg ${a.color}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <Badge variant="secondary" className="text-[10px]">{a.type}</Badge>
-                </div>
-                <div className="mt-3 text-sm font-semibold">{a.name}</div>
-                <div className="text-xs text-muted-foreground">{a.bank}</div>
-                <div className={`mt-3 text-xl font-semibold tabular-nums ${a.balance < 0 ? "text-destructive" : ""}`}>
-                  {formatINR(a.balance)}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <Card className="mt-6 border-border/70">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base font-semibold">All accounts</CardTitle>
-          <Input placeholder="Search accounts..." className="h-8 w-56" />
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Account</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Institution</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {accounts.map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="font-medium">{a.name}</TableCell>
-                  <TableCell><Badge variant="secondary" className="text-[10px]">{a.type}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground">{a.bank}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatDateIN(a.updated)}</TableCell>
-                  <TableCell className={`text-right tabular-nums ${a.balance < 0 ? "text-destructive" : ""}`}>{formatINR(a.balance)}</TableCell>
-                  <TableCell><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog({ kind: "account", entity: a })}><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeAccount(a.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <AccountsList
+        groups={groups}
+        totalAccounts={items.length}
+        query={query}
+        onQueryChange={setQuery}
+        isLoading={wallets.isLoading}
+        isError={wallets.isError}
+        onRetry={wallets.refetch}
+        onTransfer={() => openDialog("transfer")}
+        onEdit={(id) => {
+          const a = accountById(id);
+          if (a) openEditDialog({ kind: "account", entity: a });
+        }}
+        onRemove={(id) => removeAccount(id)}
+        onAdd={() => openDialog("account")}
+      />
     </div>
   );
 }
