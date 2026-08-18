@@ -87,9 +87,15 @@ export function Accounts() {
     ];
   }, [filtered]);
 
-  const available = items.filter((i) => i.balance > 0).reduce((s, i) => s + i.balance, 0);
-  const outstanding = items.filter((i) => i.balance < 0).reduce((s, i) => s + Math.abs(i.balance), 0);
-  const netPosition = items.reduce((s, i) => s + i.balance, 0);
+  // A card/loan account holds what you owe, however its balance is signed —
+  // spendable money only ever comes from non-credit accounts.
+  const available = items
+    .filter((i) => !i.isCredit && i.balance > 0)
+    .reduce((s, i) => s + i.balance, 0);
+  const outstanding = items
+    .filter((i) => i.isCredit || i.balance < 0)
+    .reduce((s, i) => s + Math.abs(i.balance), 0);
+  const netPosition = available - outstanding;
   const cashCount = items.filter(
     (i) => !CREDIT_TYPES.has(i.type) && !INVESTMENT_TYPES.has(i.type),
   ).length;
@@ -109,11 +115,6 @@ export function Accounts() {
       label: "Investment accounts",
       amount: positiveIn((i) => INVESTMENT_TYPES.has(i.type)),
       className: "bg-chart-2",
-    },
-    {
-      label: "Cards & loans",
-      amount: positiveIn((i) => CREDIT_TYPES.has(i.type)),
-      className: "bg-muted-foreground/40",
     },
   ];
 
