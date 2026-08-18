@@ -130,12 +130,12 @@ export function EntityDialogs({
   // The balance is ledger-authoritative: it can only be set once, as the
   // opening balance. Editing an account never overwrites the derived balance.
   const accountFields: FieldDef[] = [
-    { key: "name", label: "Account name", type: "text", required: true },
-    { key: "bank", label: "Bank / Provider", type: "text", required: true },
-    { key: "type", label: "Account type", type: "select", options: ACCOUNT_TYPES as unknown as string[], required: true },
+    { key: "name", label: "Account name", type: "text", required: true, placeholder: "e.g. HDFC Salary", hint: "How you'll recognise it in lists and forms" },
+    { key: "bank", label: "Bank / Provider", type: "text", required: true, placeholder: "e.g. HDFC Bank, Paytm" },
+    { key: "type", label: "Account type", type: "select", options: ACCOUNT_TYPES as unknown as string[], required: true, hint: "Credit Card and Loan Account track what you owe" },
     ...(isEdit("account")
       ? []
-      : ([{ key: "balance", label: "Opening balance (₹)", type: "number", required: true }] as FieldDef[])),
+      : ([{ key: "balance", label: "Opening balance (₹)", type: "number", required: true, hint: "Set once — after this the balance follows your transactions" }] as FieldDef[])),
   ];
 
   const incomeFields: FieldDef[] = [
