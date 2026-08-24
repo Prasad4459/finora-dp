@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   Car,
@@ -489,7 +489,7 @@ function Results({ result, years }: { result: ScenarioResult; years: ProjectionY
                   <span
                     className={cn(
                       "block text-[11px] tabular-nums",
-                      (r.higherIsBetter ?? true) === r.delta > 0
+                      ((r.higherIsBetter ?? true) ? r.delta > 0 : r.delta < 0)
                         ? "text-primary"
                         : "text-destructive",
                     )}
@@ -578,7 +578,7 @@ function Results({ result, years }: { result: ScenarioResult; years: ProjectionY
   );
 }
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="space-y-3">
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
