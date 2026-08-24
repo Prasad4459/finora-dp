@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Car, LineChart, Scale, AlertTriangle, Info, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Car,
+  LineChart,
+  Scale,
+  AlertTriangle,
+  Info,
+  Sparkles,
+  ArrowRight,
+} from "lucide-react";
 import { PageHeader } from "@/components/finance/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,10 +23,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { WidgetError } from "@/components/finance/widget-state";
+import {
+  ScenarioPicker,
+  ScenarioTabs,
+  type ScenarioOption,
+} from "@/components/finance/what-if/scenario-picker";
 import { formatINR } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useScenarioSnapshot } from "@/hooks/use-scenario-snapshot";
 import {
   PROJECTION_YEARS,
+  compareScenarios,
   emiFor,
   runInvestMoreScenario,
   runInvestVsPrepayScenario,
@@ -28,23 +45,26 @@ import {
 
 type ScenarioKey = "emi" | "invest" | "prepay";
 
-const SCENARIOS = [
+const SCENARIOS: ReadonlyArray<ScenarioOption<ScenarioKey>> = [
   {
-    key: "emi" as const,
+    key: "emi",
     title: "New EMI",
     icon: Car,
+    question: "Can I afford this loan?",
     blurb: "See what a new loan would do to your monthly cash flow, debt and goals.",
   },
   {
-    key: "invest" as const,
+    key: "invest",
     title: "Increase Investment",
     icon: LineChart,
+    question: "What if I invest more?",
     blurb: "Project what investing more each month could be worth over time.",
   },
   {
-    key: "prepay" as const,
+    key: "prepay",
     title: "Invest vs Prepay Debt",
     icon: Scale,
+    question: "Prepay or invest?",
     blurb: "Compare paying down a loan against investing the same money.",
   },
 ];
@@ -53,6 +73,8 @@ const num = (v: string) => {
   const n = Number(v.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 };
+
+const signed = (n: number) => `${n >= 0 ? "+" : "−"}${formatINR(Math.abs(n))}`;
 
 export function WhatIf() {
   const { snapshot, isLoading, isError, refetch, current } = useScenarioSnapshot();
@@ -126,12 +148,13 @@ export function WhatIf() {
   }
 
   const missing = missingData(active, snapshot);
+  const activeScenario = SCENARIOS.find((s) => s.key === active);
 
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="What If?"
-        description="Explore how a financial decision could affect your future. Nothing here changes your real data."
+        description="Test a financial decision against your real numbers before you make it. Every projection is read-only — nothing here changes your accounts, loans, goals or transactions."
         actions={
           active ? (
             <Button size="sm" variant="outline" onClick={() => reset(null)}>
@@ -141,211 +164,285 @@ export function WhatIf() {
         }
       />
 
-      {isError && (
-        <Card className="mb-6 border-destructive/40">
-          <CardContent className="flex items-center justify-between gap-4 p-5 text-sm">
-            <span className="text-muted-foreground">
-              Couldn&apos;t load your financial summary, so projections can&apos;t be calculated.
-            </span>
-            <Button size="sm" variant="outline" onClick={refetch}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      {/* Current situation — the baseline every scenario is compared against. */}
+      <Card className="mb-6 border-border/70">
+        <CardContent className="p-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Current situation
+              </div>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                Your position today, before any hypothetical change.
+              </p>
+            </div>
+            <Badge variant="secondary" className="shrink-0 text-[10px]">
+              Baseline
+            </Badge>
+          </div>
+
+          {isError ? (
+            <WidgetError
+              className="mt-2"
+              message="Couldn't load your financial summary, so projections can't be calculated."
+              onRetry={refetch}
+            />
+          ) : (
+            <>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Figure label="Net worth" value={formatINR(snapshot.netWorth)} loading={isLoading} />
+                <Figure
+                  label="Avg monthly surplus"
+                  value={formatINR(snapshot.monthlySurplus)}
+                  loading={isLoading}
+                  tone={snapshot.monthlySurplus < 0 ? "negative" : "neutral"}
+                />
+                <Figure
+                  label="Total debt"
+                  value={formatINR(snapshot.totalDebt)}
+                  loading={isLoading}
+                />
+                <Figure
+                  label="Invested capital"
+                  value={formatINR(snapshot.totalInvestments)}
+                  loading={isLoading}
+                />
+              </div>
+              <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+                Monthly figures are averages of your last {snapshot.monthsOfHistory || 0} month
+                {snapshot.monthsOfHistory === 1 ? "" : "s"} of recorded activity.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {!active && (
-        <div className="grid gap-4 md:grid-cols-3">
-          {SCENARIOS.map((s) => (
-            <Card
-              key={s.key}
-              className="cursor-pointer border-border/70 transition hover:-translate-y-0.5 hover:border-primary/40"
-              onClick={() => reset(s.key)}
-            >
-              <CardContent className="p-5">
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary">
-                  <s.icon className="h-5 w-5" />
-                </div>
-                <div className="mt-4 text-sm font-semibold">{s.title}</div>
-                <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{s.blurb}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {!active && (
-        <Card className="mt-6 border-border/70">
-          <CardContent className="p-5">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Your starting point
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Figure label="Net worth" value={formatINR(snapshot.netWorth)} loading={isLoading} />
-              <Figure
-                label="Avg monthly surplus"
-                value={formatINR(snapshot.monthlySurplus)}
-                loading={isLoading}
-              />
-              <Figure label="Total debt" value={formatINR(snapshot.totalDebt)} loading={isLoading} />
-              <Figure
-                label="Invested capital"
-                value={formatINR(snapshot.totalInvestments)}
-                loading={isLoading}
-              />
-            </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              Monthly figures are averages of your last {snapshot.monthsOfHistory || 0} month
-              {snapshot.monthsOfHistory === 1 ? "" : "s"} of recorded activity.
-            </p>
-          </CardContent>
-        </Card>
+        <>
+          <h2 className="mb-3 text-sm font-semibold">Choose a decision to explore</h2>
+          <ScenarioPicker options={SCENARIOS} active={active} onSelect={reset} />
+        </>
       )}
 
       {active && (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-          <Card className="border-border/70">
-            <CardContent className="space-y-4 p-5">
-              <div className="text-sm font-semibold">
-                {SCENARIOS.find((s) => s.key === active)?.title}
-              </div>
+        <>
+          <ScenarioTabs options={SCENARIOS} active={active} onSelect={reset} />
 
-              {missing.length > 0 ? (
-                <div className="rounded-lg border border-border/70 bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
-                  {missing.map((m) => (
-                    <p key={m}>{m}</p>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  {active === "emi" && (
-                    <>
-                      <Field label="Purchase / loan amount (₹)" value={purchase} onChange={setPurchase} />
-                      <Field label="Down payment (₹)" value={down} onChange={setDown} />
-                      <Field label="Interest rate (% per year)" value={rate} onChange={setRate} />
-                      <Field label="Tenure (months)" value={tenure} onChange={setTenure} />
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">EMI (₹ per month)</Label>
-                        <Input
-                          inputMode="decimal"
-                          value={emi}
-                          placeholder={String(Math.round(suggestedEmi))}
-                          onChange={(e) => setEmi(e.target.value)}
-                        />
-                        <p className="text-[11px] text-muted-foreground">
-                          Leave blank to use the calculated EMI of {formatINR(suggestedEmi)}.
-                        </p>
-                      </div>
-                    </>
-                  )}
-
-                  {active === "invest" && (
-                    <>
-                      <Field
-                        label="Additional monthly investment (₹)"
-                        value={extraMonthly}
-                        onChange={setExtraMonthly}
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        You currently invest about {formatINR(snapshot.monthlyInvestment)} per month.
-                      </p>
-                    </>
-                  )}
-
-                  {active === "prepay" && (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Liability</Label>
-                        <Select value={liabilityId} onValueChange={setLiabilityId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a loan" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {snapshot.liabilities.map((l) => (
-                              <SelectItem key={l.id} value={l.id}>
-                                {l.name} — {formatINR(l.balance)} @ {l.rate}%
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Field label="One-time amount (₹)" value={lumpSum} onChange={setLumpSum} />
-                    </>
-                  )}
-
-                  {active !== "emi" && (
-                    <Field
-                      label="Expected annual return (%)"
-                      value={expectedReturn}
-                      onChange={setExpectedReturn}
-                    />
-                  )}
-                  {active === "emi" && (
-                    <Field
-                      label="Assumed investment return (%)"
-                      value={expectedReturn}
-                      onChange={setExpectedReturn}
-                    />
-                  )}
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Projection period</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {PROJECTION_YEARS.map((y) => (
-                        <Button
-                          key={y}
-                          type="button"
-                          size="sm"
-                          variant={years === y ? "default" : "outline"}
-                          onClick={() => {
-                            setYears(y);
-                            setResult(null);
-                          }}
-                        >
-                          {y} year{y === 1 ? "" : "s"}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator />
-                  <Button className="w-full" onClick={run} disabled={isLoading || isError}>
-                    <Sparkles className="mr-1.5 h-4 w-4" /> Run scenario
-                  </Button>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    This is a projection only. Nothing is saved and none of your accounts,
-                    investments, loans, goals or transactions are changed.
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+            <Card className="h-fit border-border/70">
+              <CardContent className="space-y-5 p-5">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{activeScenario?.title}</div>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {activeScenario?.blurb}
                   </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                </div>
 
-          <div className="space-y-6">
-            {!result ? (
-              <Card className="border-border/70">
-                <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                  {missing.length > 0
-                    ? "Add the missing information to run this scenario."
-                    : "Set your assumptions and run the scenario to see the comparison."}
-                </CardContent>
-              </Card>
-            ) : (
-              <Results result={result} />
-            )}
+                {missing.length > 0 ? (
+                  <div className="rounded-lg border border-border/70 bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
+                    {missing.map((m) => (
+                      <p key={m}>{m}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <Group title="The decision">
+                      {active === "emi" && (
+                        <>
+                          <Field
+                            label="Purchase / loan amount (₹)"
+                            value={purchase}
+                            onChange={setPurchase}
+                          />
+                          <Field label="Down payment (₹)" value={down} onChange={setDown} />
+                          <Field label="Interest rate (% per year)" value={rate} onChange={setRate} />
+                          <Field label="Tenure (months)" value={tenure} onChange={setTenure} />
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">EMI (₹ per month)</Label>
+                            <Input
+                              inputMode="decimal"
+                              value={emi}
+                              placeholder={String(Math.round(suggestedEmi))}
+                              onChange={(e) => setEmi(e.target.value)}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              Leave blank to use the calculated EMI of {formatINR(suggestedEmi)}.
+                            </p>
+                          </div>
+                        </>
+                      )}
+
+                      {active === "invest" && (
+                        <>
+                          <Field
+                            label="Additional monthly investment (₹)"
+                            value={extraMonthly}
+                            onChange={setExtraMonthly}
+                          />
+                          <p className="text-[11px] text-muted-foreground">
+                            You currently invest about {formatINR(snapshot.monthlyInvestment)} per
+                            month.
+                          </p>
+                        </>
+                      )}
+
+                      {active === "prepay" && (
+                        <>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Liability</Label>
+                            <Select value={liabilityId} onValueChange={setLiabilityId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a loan" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {snapshot.liabilities.map((l) => (
+                                  <SelectItem key={l.id} value={l.id}>
+                                    {l.name} — {formatINR(l.balance)} @ {l.rate}%
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Field label="One-time amount (₹)" value={lumpSum} onChange={setLumpSum} />
+                        </>
+                      )}
+                    </Group>
+
+                    <Separator />
+
+                    <Group title="Assumptions">
+                      <Field
+                        label={
+                          active === "emi"
+                            ? "Assumed investment return (%)"
+                            : "Expected annual return (%)"
+                        }
+                        value={expectedReturn}
+                        onChange={setExpectedReturn}
+                      />
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Projection period</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {PROJECTION_YEARS.map((y) => (
+                            <Button
+                              key={y}
+                              type="button"
+                              size="sm"
+                              variant={years === y ? "default" : "outline"}
+                              onClick={() => {
+                                setYears(y);
+                                setResult(null);
+                              }}
+                            >
+                              {y}y
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </Group>
+
+                    <Button className="w-full" onClick={run} disabled={isLoading || isError}>
+                      <Sparkles className="mr-1.5 h-4 w-4" /> Run scenario
+                    </Button>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      This is a projection only. Nothing is saved and none of your accounts,
+                      investments, loans, goals or transactions are changed.
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="min-w-0 space-y-6">
+              {!result ? (
+                <Card className="border-dashed border-border/70 bg-muted/20">
+                  <CardContent className="p-10 text-center">
+                    <p className="text-sm font-medium">
+                      {missing.length > 0
+                        ? "This scenario needs a little more data"
+                        : "No projection yet"}
+                    </p>
+                    <p className="mx-auto mt-1.5 max-w-sm text-xs leading-relaxed text-muted-foreground">
+                      {missing.length > 0
+                        ? "Add the missing information above and this comparison will become available."
+                        : "Set your assumptions on the left, then run the scenario to compare your current path with this decision."}
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Results result={result} years={years} />
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-function Results({ result }: { result: ScenarioResult }) {
+function Results({ result, years }: { result: ScenarioResult; years: ProjectionYears }) {
+  const diff = compareScenarios(result.current, result.scenario);
+  const surplusNegative = result.scenario.cashFlow.surplus < 0;
+
   return (
     <>
+      {/* Projected outcome — the headline financial impact. */}
+      <Card className="border-border/70">
+        <CardContent className="p-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Projected outcome
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {result.current.label} vs {result.scenario.label}, over {years} year
+                {years === 1 ? "" : "s"}
+              </p>
+            </div>
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Projection
+            </Badge>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <Delta
+              label={`Net worth in ${years}y`}
+              value={signed(diff.netWorthDelta)}
+              good={diff.netWorthDelta >= 0}
+              hint={formatINR(result.scenario.netWorth.netWorth)}
+            />
+            <Delta
+              label="Monthly surplus"
+              value={signed(diff.surplusDelta)}
+              good={diff.surplusDelta >= 0}
+              hint={`${formatINR(result.scenario.cashFlow.surplus)} left each month`}
+            />
+            <Delta
+              label={`Debt in ${years}y`}
+              value={signed(diff.debtDelta)}
+              good={diff.debtDelta <= 0}
+              hint={formatINR(result.scenario.netWorth.debt)}
+            />
+          </div>
+
+          {surplusNegative && (
+            <div className="mt-4 flex gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs leading-relaxed">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
+              <span>
+                This decision puts your monthly cash flow into shortfall — you would spend more than
+                you bring in each month.
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {result.warnings.length > 0 && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="space-y-2 p-5">
+            <div className="text-xs font-medium uppercase tracking-wide text-destructive">
+              Before you decide
+            </div>
             {result.warnings.map((w) => (
               <div key={w} className="flex gap-2 text-xs leading-relaxed text-foreground">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
@@ -356,21 +453,51 @@ function Results({ result }: { result: ScenarioResult }) {
         </Card>
       )}
 
+      {/* Side-by-side path comparison. */}
       <Card className="border-border/70">
         <CardContent className="p-0">
-          <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-border/70 px-5 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <span />
-            <span>{result.current.label}</span>
-            <span>{result.scenario.label}</span>
+          <div className="flex items-center gap-2 border-b border-border/70 px-5 py-3">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Current path
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium uppercase tracking-wide text-primary">
+              {result.scenario.label}
+            </span>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-border/70 bg-muted/30 px-5 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span>Measure</span>
+            <span className="text-right">{result.current.label}</span>
+            <span className="text-right">{result.scenario.label}</span>
           </div>
           {result.rows.map((r) => (
             <div
               key={r.label}
-              className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 border-b border-border/50 px-5 py-3 text-sm last:border-0"
+              className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-2 border-b border-border/50 px-5 py-3 last:border-0"
             >
-              <span className="text-xs text-muted-foreground">{r.label}</span>
-              <span className="tabular-nums">{r.current}</span>
-              <span className="font-medium tabular-nums">{r.scenario}</span>
+              <span className="min-w-0 text-xs leading-relaxed text-muted-foreground">
+                {r.label}
+              </span>
+              <span className="truncate text-right text-xs tabular-nums text-muted-foreground">
+                {r.current}
+              </span>
+              <span className="min-w-0 text-right">
+                <span className="block truncate text-sm font-semibold tabular-nums">
+                  {r.scenario}
+                </span>
+                {r.delta !== undefined && r.delta !== 0 && (
+                  <span
+                    className={cn(
+                      "block text-[11px] tabular-nums",
+                      (r.higherIsBetter ?? true) === r.delta > 0
+                        ? "text-primary"
+                        : "text-destructive",
+                    )}
+                  >
+                    {signed(r.delta)}
+                  </span>
+                )}
+              </span>
             </div>
           ))}
         </CardContent>
@@ -379,13 +506,13 @@ function Results({ result }: { result: ScenarioResult }) {
       <Card className="border-border/70">
         <CardContent className="p-5">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Key impact
+            What this means
           </div>
           <ul className="mt-3 space-y-2 text-sm leading-relaxed">
             {result.keyImpacts.map((k) => (
               <li key={k} className="flex gap-2">
                 <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                <span>{k}</span>
+                <span className="min-w-0">{k}</span>
               </li>
             ))}
           </ul>
@@ -405,18 +532,18 @@ function Results({ result }: { result: ScenarioResult }) {
             <div className="mt-3 space-y-3">
               {result.goals.map((g) => (
                 <div key={g.goalId} className="rounded-lg border border-border/60 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{g.name}</span>
-                    <div className="flex items-center gap-1.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                    <span className="truncate text-sm font-medium">{g.name}</span>
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <Badge variant="secondary" className="text-[10px]">
-                        Current: {g.currentLabel ?? "—"}
+                        Now: {g.currentLabel ?? "—"}
                       </Badge>
                       <Badge variant="outline" className="text-[10px]">
                         Scenario: {g.scenarioLabel ?? "—"}
                       </Badge>
                     </div>
                   </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">{g.message}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{g.message}</p>
                 </div>
               ))}
             </div>
@@ -429,10 +556,10 @@ function Results({ result }: { result: ScenarioResult }) {
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Assumptions
           </div>
-          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+          <dl className="mt-3 divide-y divide-border/50">
             {result.assumptions.map((a) => (
-              <div key={a.label} className="flex justify-between gap-3 text-xs">
-                <dt className="text-muted-foreground">{a.label}</dt>
+              <div key={a.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 py-2 text-xs">
+                <dt className="min-w-0 text-muted-foreground">{a.label}</dt>
                 <dd className="text-right font-medium">{a.value}</dd>
               </div>
             ))}
@@ -448,6 +575,44 @@ function Results({ result }: { result: ScenarioResult }) {
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Delta({
+  label,
+  value,
+  hint,
+  good,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  good: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-border/60 p-3">
+      <div className="truncate text-xs text-muted-foreground">{label}</div>
+      <div
+        className={cn(
+          "mt-1 truncate font-display text-lg font-semibold tabular-nums sm:text-xl",
+          good ? "text-primary" : "text-destructive",
+        )}
+      >
+        {value}
+      </div>
+      <div className="truncate text-[11px] text-muted-foreground">{hint}</div>
+    </div>
   );
 }
 
@@ -468,14 +633,33 @@ function Field({
   );
 }
 
-function Figure({ label, value, loading }: { label: string; value: string; loading: boolean }) {
+function Figure({
+  label,
+  value,
+  loading,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  loading: boolean;
+  tone?: "neutral" | "negative";
+}) {
   return (
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
+    <div className="min-w-0">
+      <div className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
       {loading ? (
         <div className="mt-2 h-6 w-24 animate-pulse rounded bg-muted" />
       ) : (
-        <div className="mt-1 font-display text-lg font-semibold tabular-nums">{value}</div>
+        <div
+          className={cn(
+            "mt-1 truncate font-display text-lg font-semibold tabular-nums sm:text-xl",
+            tone === "negative" && "text-destructive",
+          )}
+        >
+          {value}
+        </div>
       )}
     </div>
   );
