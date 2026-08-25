@@ -260,7 +260,7 @@ function NetWorthHero() {
                   <div className="mt-3 grid grid-cols-2 gap-4">
                     <HeroMetric label="Invested" value={currency(p.invested)} />
                     <HeroMetric
-                      label="Unrealised"
+                      label="Unrealised gain"
                       value={`${p.gain >= 0 ? "+" : "\u2212"}${currency(Math.abs(p.gain))}`}
                       hint={`${p.gain >= 0 ? "+" : "\u2212"}${Math.abs(p.gainPct).toFixed(1)}%`}
                       tone={p.gain >= 0 ? "positive" : "negative"}
